@@ -6,13 +6,13 @@
 
 // ── CONFIGURATION ──────────────────────────────────────────────────────────
 // Define the secret token set on GitHub webhook settings
-define('WEBHOOK_SECRET', 'your_webhook_secret_here'); 
+define('WEBHOOK_SECRET', 'MySuperSecretToken123!#');
 
 // The branch to track and pull
-define('DEPLOY_BRANCH', 'main'); 
+define('DEPLOY_BRANCH', 'main');
 
 // The root path of the local git repository
-define('REPO_DIR', __DIR__); 
+define('REPO_DIR', __DIR__);
 
 // Log file destination for auditing deployments
 define('LOG_FILE', REPO_DIR . '/uploads/deploy_log.txt');
@@ -85,16 +85,17 @@ echo "Git Output:\n" . $output . "\n";
 
 
 // Helper: Write audit logs
-function log_deployment($message) {
+function log_deployment($message)
+{
     $timestamp = date('[Y-m-d H:i:s]');
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'Unknown IP';
     $log_entry = "{$timestamp} [IP: {$ip}] {$message}\n" . str_repeat('-', 80) . "\n";
-    
+
     // Ensure parent folder exists (e.g. uploads folder)
     $dir = dirname(LOG_FILE);
     if (!is_dir($dir)) {
         @mkdir($dir, 0755, true);
     }
-    
+
     @file_put_contents(LOG_FILE, $log_entry, FILE_APPEND);
 }
