@@ -78,6 +78,16 @@
             // Find the submit button inside this form
             var submitBtn = e.target.querySelector('button[type="submit"]') || e.target.querySelector('input[type="submit"]');
             if (submitBtn) {
+                // If the button has a name and is about to be disabled by Ladda,
+                // append a hidden input so its name/value is still submitted to the server.
+                if (submitBtn.name && !e.target.querySelector('input[type="hidden"][name="' + submitBtn.name + '"]')) {
+                    var hiddenInput = document.createElement('input');
+                    hiddenInput.type = 'hidden';
+                    hiddenInput.name = submitBtn.name;
+                    hiddenInput.value = submitBtn.value || '1';
+                    e.target.appendChild(hiddenInput);
+                }
+
                 // Apply Ladda classes and attributes
                 if (!submitBtn.classList.contains('ladda-button')) {
                     submitBtn.classList.add('ladda-button');
