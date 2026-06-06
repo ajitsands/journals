@@ -24,6 +24,8 @@ $logged_user = get_logged_in_user();
     <link rel="stylesheet" href="<?php echo $path_prefix; ?>assets/css/styles.css">
     <!-- jQuery DataTables CSS (for all logged-in users) -->
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
+    <!-- Ladda UI Button Spinners CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ladda@1.0.6/dist/ladda-themeless.min.css">
 </head>
 <body>
     <header>

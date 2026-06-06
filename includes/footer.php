@@ -67,5 +67,40 @@
             }
         });
     </script>
+    <!-- Ladda & Spin JS (Global form submission loaders) -->
+    <script src="https://cdn.jsdelivr.net/npm/ladda@1.0.6/dist/spin.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ladda@1.0.6/dist/ladda.min.js"></script>
+    <script>
+        document.addEventListener('submit', function(e) {
+            // Check if submission is already prevented by validation scripts
+            if (e.defaultPrevented) return;
+
+            // Find the submit button inside this form
+            var submitBtn = e.target.querySelector('button[type="submit"]') || e.target.querySelector('input[type="submit"]');
+            if (submitBtn) {
+                // Apply Ladda classes and attributes
+                if (!submitBtn.classList.contains('ladda-button')) {
+                    submitBtn.classList.add('ladda-button');
+                }
+                if (!submitBtn.hasAttribute('data-style')) {
+                    submitBtn.setAttribute('data-style', 'expand-right');
+                }
+                
+                // Wrap content inside a ladda-label tag if not already done
+                if (!submitBtn.querySelector('.ladda-label')) {
+                    var innerSpan = document.createElement('span');
+                    innerSpan.className = 'ladda-label';
+                    while (submitBtn.firstChild) {
+                        innerSpan.appendChild(submitBtn.firstChild);
+                    }
+                    submitBtn.appendChild(innerSpan);
+                }
+
+                // Start loading animation
+                var l = Ladda.create(submitBtn);
+                l.start();
+            }
+        });
+    </script>
 </body>
 </html>
