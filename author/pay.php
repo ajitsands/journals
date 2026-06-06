@@ -501,7 +501,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <!-- Bottom: QR thumbnail -->
                     <div style="display: flex; align-items: center; justify-content: center; padding: 1.1rem 1.5rem; gap: 16px;">
                         <div id="qrThumbWrap" onclick="openQRModal()" style="cursor: pointer; position: relative; flex-shrink: 0;">
-                            <img src="../assets/QR/upi_qr.jpg" alt="UPI QR Code - Tap to enlarge"
+                            <img id="upiQrThumb" src="../assets/QR/upi_qr.jpg" alt="UPI QR Code - Tap to enlarge"
                                 style="width: 88px; height: 88px; object-fit: cover; border-radius: 10px; border: 3px solid rgba(255,255,255,0.85); display: block; box-shadow: 0 4px 14px rgba(0,0,0,0.3); transition: transform 0.2s;"
                                 onmouseover="this.style.transform='scale(1.06)'" onmouseout="this.style.transform='scale(1)'">
                             <div style="position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.65); color: white; font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 8px; border-radius: 20px; white-space: nowrap;">
@@ -509,8 +509,21 @@ require_once __DIR__ . '/../includes/header.php';
                             </div>
                         </div>
                         <div style="flex: 1; font-size: 0.75rem; color: rgba(255,255,255,0.8); line-height: 1.55;">
-                            <div style="font-weight: 700; color: white; font-size: 0.82rem; margin-bottom: 4px;">📲 How to Pay via QR</div>
-                            Open any UPI app (GPay, PhonePe, Paytm, BHIM) &rarr; Scan QR &rarr; Enter amount &rarr; Pay &amp; save the receipt screenshot.
+                            <div style="font-weight: 700; color: white; font-size: 0.82rem; margin-bottom: 4px;">📲 How to Pay</div>
+                            <span class="desktop-instructions">Open any UPI app (GPay, PhonePe, Paytm, BHIM) &rarr; Scan QR &rarr; Amount and note will be prefilled &rarr; Pay &amp; save receipt.</span>
+                            <!-- Mobile-only payment shortcut -->
+                            <div class="mobile-only-pay-btn" style="margin-top: 8px; display: none;">
+                                <a class="upiPayDeepLinkClass" href="#" style="
+                                    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+                                    background: linear-gradient(135deg, #10b981, #059669);
+                                    color: white; border: none; border-radius: 8px;
+                                    padding: 8px 14px; font-size: 0.75rem; font-weight: 700;
+                                    text-decoration: none; box-shadow: 0 4px 10px rgba(16,185,129,0.25);
+                                    transition: transform 0.2s, opacity 0.2s;
+                                " onmouseover="this.style.opacity='0.92'; this.style.transform='translateY(-1px)'" onmouseout="this.style.opacity='1'; this.style.transform='translateY(0)'">
+                                    📱 Pay directly via UPI App
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -613,7 +626,7 @@ require_once __DIR__ . '/../includes/header.php';
         <!-- QR Image with pulse ring -->
         <div style="position: relative; display: inline-block; margin-bottom: 16px;">
             <div class="qr-pulse-ring"></div>
-            <img src="../assets/QR/upi_qr.jpg" alt="UPI QR Code"
+            <img id="upiQrLarge" src="../assets/QR/upi_qr.jpg" alt="UPI QR Code"
                 style="width: 280px; max-width: 100%; border-radius: 12px; display: block;
                        border: 4px solid #f1f5f9; box-shadow: 0 4px 20px rgba(0,0,0,0.12);">
         </div>
@@ -621,6 +634,21 @@ require_once __DIR__ . '/../includes/header.php';
         <!-- UPI ID chip -->
         <div style="display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg,#4c1d95,#6d28d9); color: white; border-radius: 30px; padding: 7px 20px; font-size: 0.9rem; font-weight: 800; font-family: monospace; letter-spacing: 0.5px; margin-bottom: 14px;">
             📱 sandslab2023@fbl
+        </div>
+
+        <!-- Mobile Deep Link Payment Button inside Modal -->
+        <div class="mobile-only-pay-btn" style="margin-bottom: 14px; display: none;">
+            <a class="upiPayDeepLinkClass" href="#" style="
+                display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+                background: linear-gradient(135deg, #16a34a, #10b981);
+                color: white; border: none; border-radius: 10px;
+                padding: 10px 20px; font-size: 0.88rem; font-weight: 700;
+                text-decoration: none; box-shadow: 0 4px 12px rgba(22,163,74,0.3);
+                transition: transform 0.2s, opacity 0.2s;
+                width: 100%; box-sizing: border-box;
+            " onmouseover="this.style.opacity='0.92'; this.style.transform='translateY(-1px)'" onmouseout="this.style.opacity='1'; this.style.transform='translateY(0)'">
+                📱 Pay via UPI App (GPay/PhonePe)
+            </a>
         </div>
 
         <!-- App logos hint -->
@@ -661,7 +689,61 @@ require_once __DIR__ . '/../includes/header.php';
 }
 </style>
 
+<!-- Load client-side QR Code Generator library from CDN -->
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+
 <script>
+// Dynamic UPI Link parameters
+(function() {
+    var payeeVpa = "sandslab2023@fbl";
+    var payeeName = "SaNDS Lab";
+    var amount = "<?php echo number_format($journal['payment_amount'], 2, '.', ''); ?>";
+    var currency = "INR";
+    var transactionNote = "<?php echo rawurlencode('Payment for ' . $journal['journal_number']); ?>";
+
+    // Construct UPI URI
+    var upiLink = "upi://pay?pa=" + encodeURIComponent(payeeVpa) + 
+                  "&pn=" + encodeURIComponent(payeeName) + 
+                  "&am=" + encodeURIComponent(amount) + 
+                  "&cu=" + encodeURIComponent(currency) + 
+                  "&tn=" + decodeURIComponent(transactionNote);
+
+    // Generate dynamic QR Code using QRCode library
+    if (typeof QRCode !== 'undefined') {
+        QRCode.toDataURL(upiLink, { width: 300, margin: 2 }, function (err, url) {
+            if (err) {
+                console.error('Error generating dynamic QR code:', err);
+                return;
+            }
+            var thumbImg = document.getElementById('upiQrThumb');
+            var largeImg = document.getElementById('upiQrLarge');
+            if (thumbImg) thumbImg.src = url;
+            if (largeImg) largeImg.src = url;
+        });
+    }
+
+    // Mobile check & display payment links
+    if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+        // Show all mobile-only pay buttons
+        var btns = document.querySelectorAll('.mobile-only-pay-btn');
+        btns.forEach(function(btn) {
+            btn.style.display = 'block';
+        });
+        
+        // Populate deep links
+        var deepLinks = document.querySelectorAll('.upiPayDeepLinkClass');
+        deepLinks.forEach(function(link) {
+            link.href = upiLink;
+        });
+
+        // Hide desktop-only text
+        var desktopText = document.querySelector('.desktop-instructions');
+        if (desktopText) {
+            desktopText.style.display = 'none';
+        }
+    }
+})();
+
 function openQRModal() {
     var m = document.getElementById('qrLightbox');
     m.style.display = 'flex';

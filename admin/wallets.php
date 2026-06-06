@@ -602,7 +602,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <div style="font-size: 1.4rem;">📱</div>
                         <div>
                             <div style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.8px; color: rgba(255,255,255,0.7); font-weight: 600;">UPI ID</div>
-                            <div style="font-size: 0.9rem; font-weight: 800; color: white; font-family: monospace; letter-spacing: 0.5px;">sandslab2023@fbi</div>
+                            <div style="font-size: 0.9rem; font-weight: 800; color: white; font-family: monospace; letter-spacing: 0.5px;">sandslab2023@fbl</div>
                         </div>
                     </div>
 
