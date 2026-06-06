@@ -1,6 +1,5 @@
 <?php
-$page_title = "Login Portal";
-require_once __DIR__ . '/includes/header.php';
+require_once __DIR__ . '/includes/auth.php';
 
 // If already logged in, redirect
 if (is_logged_in()) {
@@ -41,6 +40,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message_type = "danger";
     }
 }
+
+$page_title = "Login Portal";
+require_once __DIR__ . '/includes/header.php';
 ?>
 
 <!-- Animated Academic Background Icons -->
