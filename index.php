@@ -263,7 +263,7 @@ try {
                         <div class="workflow-badge">2</div>
                         <div class="workflow-content">
                             <h4>Submit Manuscript</h4>
-                            <p>Upload your draft manuscript in PDF/DOCX format, adding title and abstract. A unique <strong>Journal Number</strong> will be assigned to your submission.</p>
+                            <p>Upload your draft manuscript in PDF/DOCX format (compliant with IMRAD structure and APA 7th edition format), adding title and abstract. A unique <strong>Journal Number</strong> will be assigned to your submission.</p>
                         </div>
                     </div>
                     <div class="workflow-step">

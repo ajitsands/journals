@@ -255,6 +255,9 @@ require_once __DIR__ . '/../includes/header.php';
                 <div class="form-group">
                     <label for="manuscript">Manuscript File (PDF, DOCX, DOC, or TXT)</label>
                     <input type="file" name="manuscript" id="manuscript" class="form-control" <?php echo $is_edit ? '' : 'required'; ?>>
+                    <small style="display: block; margin-top: 5px; color: #7f8c8d; font-size: 0.82rem;">
+                        <strong>⚠️ Format Requirement:</strong> The manuscript must comply with the <strong>IMRAD structure</strong> and <strong>APA 7th edition format</strong>.
+                    </small>
                     <?php if ($is_edit): ?>
                         <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;">
                             Current file: <a href="<?php echo $path_prefix . $edit_journal['manuscript_file']; ?>" target="_blank"><?php echo basename($edit_journal['manuscript_file']); ?></a>. Leave blank to keep the same file.
