@@ -7,6 +7,28 @@
 require_once __DIR__ . '/../config/db.php';
 
 /**
+ * Returns the absolute base URL of the RJPES installation.
+ */
+function rjpes_get_base_url() {
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost:3031';
+    
+    $script_name = $_SERVER['SCRIPT_NAME'] ?? '';
+    $base_path = '/';
+    if (!empty($script_name)) {
+        $dir = dirname($script_name);
+        $dir = str_replace('\\', '/', $dir);
+        $dir = rtrim($dir, '/');
+        if (preg_match('/(\/(author|reviewer|admin))$/i', $dir)) {
+            $dir = preg_replace('/(\/(author|reviewer|admin))$/i', '', $dir);
+        }
+        $base_path = rtrim($dir, '/') . '/';
+    }
+    
+    return $protocol . '://' . $host . $base_path;
+}
+
+/**
  * Returns a styled HTML email layout using RJPES theme.
  */
 function rjpes_get_email_template($title, $content_html) {
@@ -247,7 +269,7 @@ function rjpes_mail_submission($journal, $author) {
     </div>
     
     <p>We will keep you informed as your manuscript progresses through the editorial and peer evaluation workflow.</p>
-    <a href="http://localhost:3031/login.php" class="btn">Access Author Portal</a>
+    <a href="' . rjpes_get_base_url() . 'login.php" class="btn">Access Author Portal</a>
     ';
     return rjpes_send_mail($author['email'], $author['fullname'], $subject, $html);
 }
@@ -269,7 +291,7 @@ function rjpes_mail_revision($journal, $author, $version_number, $author_notes) 
     </div>
     
     <p>Your manuscript has been routed back to the verifier panel. We will communicate the final outcome to you upon completion of evaluation.</p>
-    <a href="http://localhost:3031/login.php" class="btn">Access Author Portal</a>
+    <a href="' . rjpes_get_base_url() . 'login.php" class="btn">Access Author Portal</a>
     ';
     return rjpes_send_mail($author['email'], $author['fullname'], $subject, $html);
 }
@@ -290,7 +312,7 @@ function rjpes_mail_revision_to_verifier($journal, $verifier, $version_number, $
     </div>
     
     <p>Please log in to your Verifier Dashboard to review the revised manuscript and submit your final recommendation.</p>
-    <a href="http://localhost:3031/login.php" class="btn">Go to Verifier Dashboard</a>
+    <a href="' . rjpes_get_base_url() . 'login.php" class="btn">Go to Verifier Dashboard</a>
     ';
     return rjpes_send_mail($verifier['email'], $verifier['fullname'], $subject, $html);
 }
@@ -312,7 +334,7 @@ function rjpes_mail_assignment_to_author($journal, $author) {
     </div>
     
     <p><em>Please note: To ensure objective and blind peer evaluation, the identity of the assigned verifier remains confidential.</em></p>
-    <a href="http://localhost:3031/login.php" class="btn">Download Acceptance Letter</a>
+    <a href="' . rjpes_get_base_url() . 'login.php" class="btn">Download Acceptance Letter</a>
     ';
     return rjpes_send_mail($author['email'], $author['fullname'], $subject, $html);
 }
@@ -338,7 +360,7 @@ function rjpes_mail_assignment_to_verifier($journal, $verifier) {
     </p>
     
     <p>Please log in to the Verifier Portal to view the full manuscript draft, download the text, and submit your peer review recommendation.</p>
-    <a href="http://localhost:3031/login.php" class="btn">Go to Verifier Portal</a>
+    <a href="' . rjpes_get_base_url() . 'login.php" class="btn">Go to Verifier Portal</a>
     ';
     return rjpes_send_mail($verifier['email'], $verifier['fullname'], $subject, $html);
 }
@@ -364,7 +386,7 @@ function rjpes_mail_review_outcome($journal, $author, $recommendation, $comments
         </div>
         
         <p>Thank you for contributing your research to RJPES.</p>
-        <a href="http://localhost:3031/login.php" class="btn">Access Author Portal</a>
+        <a href="' . rjpes_get_base_url() . 'login.php" class="btn">Access Author Portal</a>
         ';
     } elseif ($recommendation === 'revision') {
         $subject = "[RJPES] Revisions Required: " . $journal['journal_number'];
@@ -387,7 +409,7 @@ function rjpes_mail_review_outcome($journal, $author, $recommendation, $comments
         </p>
         
         <p>Please submit your revision at your earliest convenience to avoid publication delays.</p>
-        <a href="http://localhost:3031/login.php" class="btn">Upload Revised Manuscript</a>
+        <a href="' . rjpes_get_base_url() . 'login.php" class="btn">Upload Revised Manuscript</a>
         ';
     } else { // reject
         $subject = "[RJPES] Editorial Decision - Manuscript Rejected: " . $journal['journal_number'];
@@ -431,7 +453,7 @@ function rjpes_mail_fee_fixed($journal, $author) {
     </div>
     
     <p>Please log in to your Author Dashboard and click the "Pay Now" link to proceed to checkout and submission.</p>
-    <a href="http://localhost:3031/login.php" class="btn">Proceed to Payment Portal</a>
+    <a href="' . rjpes_get_base_url() . 'login.php" class="btn">Proceed to Payment Portal</a>
     ';
     return rjpes_send_mail($author['email'], $author['fullname'], $subject, $html);
 }
@@ -454,7 +476,7 @@ function rjpes_mail_payment_submitted($journal, $author, $payment, $admin_email 
     </div>
     
     <p>Please log in to the Editorial Administration dashboard to inspect the submitted receipt proof and publish the manuscript.</p>
-    <a href="http://localhost:3031/login.php" class="btn">Access Admin Dashboard</a>
+    <a href="' . rjpes_get_base_url() . 'login.php" class="btn">Access Admin Dashboard</a>
     ';
     return rjpes_send_mail($admin_email, 'System Administrator', $subject, $html);
 }
@@ -477,7 +499,7 @@ function rjpes_mail_published($journal, $author) {
     </div>
     
     <p>Congratulations on your publication! Thank you for choosing RJPES to share your work.</p>
-    <a href="http://localhost:3031/login.php" class="btn">View on Author Dashboard</a>
+    <a href="' . rjpes_get_base_url() . 'login.php" class="btn">View on Author Dashboard</a>
     ';
     return rjpes_send_mail($author['email'], $author['fullname'], $subject, $html);
 }
