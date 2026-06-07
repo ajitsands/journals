@@ -48,8 +48,14 @@ try {
     <div class="hero-content">
         <span class="hero-tag">VOLUME <?php echo sanitize($latest_vol); ?> • ISSUE <?php echo sanitize($latest_iss); ?> • <?php echo sanitize($latest_date); ?></span>
         <h1>Research Journal on Physical Education & Sports (RJPES)</h1>
-        <p>
-            The Voice of Sports — official peer-reviewed publication of ACTPE, University of Calicut. Advancing excellence, research, and scholarship in physical education, sports science, and allied disciplines.
+        <p style="font-size: 1.2rem; font-weight: 400; line-height: 1.6; max-width: 700px; margin: 0 auto 2.5rem;">
+            Voice of Sports - Association of College Teachers in Physical Education (ACTPE), University of Calicut
+            <br>
+            <span style="display: inline-block; margin-top: 12px; font-weight: 700; color: var(--accent-color); font-family: monospace; letter-spacing: 0.5px;">ISSN 0975-4687</span>
+            <br>
+            <span style="display: inline-block; margin-top: 6px; font-size: 1rem; font-weight: 500; background: rgba(255,255,255,0.08); padding: 4px 16px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.12);">
+                ✨ Peer-Reviewed Journal, UGC Guidelines Followed
+            </span>
         </p>
         <div class="hero-actions">
             <?php if (is_logged_in()): ?>
