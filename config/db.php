@@ -37,6 +37,15 @@ try {
         PDO::ATTR_EMULATE_PREPARES => false,
     ];
     $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+    
+    // Auto-migration: Check and add author_photo column to journals table
+    try {
+        $pdo->query("SELECT author_photo FROM journals LIMIT 1");
+    } catch (PDOException $e) {
+        try {
+            $pdo->exec("ALTER TABLE journals ADD COLUMN author_photo VARCHAR(255) DEFAULT NULL");
+        } catch (PDOException $ex) {}
+    }
 } catch (PDOException $e) {
     // In production, log error and show friendly message
     die("Database connection failed. Please ensure MySQL is running and the database is imported. Error: " . $e->getMessage());

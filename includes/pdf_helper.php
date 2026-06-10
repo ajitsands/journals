@@ -213,6 +213,17 @@ class RJPES_PDF {
         $date = date('d F Y', $pub_at);
         $month_year = date('F Y', $pub_at);
         
+        $photo_to_embed = null;
+        if (!empty($journal['author_photo'])) {
+            $photo_abs_path = __DIR__ . '/../' . ltrim(str_replace(['/', '\\'], '/', $journal['author_photo']), '/');
+            if (file_exists($photo_abs_path)) {
+                $photo_info_size = @getimagesize($photo_abs_path);
+                if ($photo_info_size && $photo_info_size[2] === IMAGETYPE_JPEG) {
+                    $photo_to_embed = $photo_abs_path;
+                }
+            }
+        }
+        
         // Define page contents
         $content_stream = "";
         
@@ -268,6 +279,27 @@ class RJPES_PDF {
         $content_stream .= "/F1 10 Tf\n";
         $content_stream .= "54 " . $current_y . " Td (" . $this->escape_text("Subject Domain: " . $domain . " | Published on: " . $date) . ") Tj\n";
         $content_stream .= "ET\n";
+        
+        if ($photo_to_embed) {
+            $p_w = 70;
+            $p_h = 90;
+            $p_x = 541 - $p_w; // 471
+            $p_y = $current_y - 55; // bottom of photo
+            
+            // Draw photo
+            $content_stream .= "q\n";
+            $content_stream .= sprintf("%.2f 0 0 %.2f %.2f %.2f cm\n", $p_w, $p_h, $p_x, $p_y);
+            $content_stream .= "/AuthorPhoto Do\n";
+            $content_stream .= "Q\n";
+            
+            // Draw border outline around photo
+            $content_stream .= "0.5 w 0.8 G\n"; // 0.8 grey
+            $content_stream .= sprintf("%.2f %.2f %.2f %.2f re S\n", $p_x - 1, $p_y - 1, $p_w + 2, $p_h + 2);
+            $content_stream .= "0 G\n"; // Reset stroke to black
+            
+            // Update current_y to be below the photo
+            $current_y = $p_y;
+        }
         
         $current_y -= 25;
         $content_stream .= "0.5 w 0 g\n"; // Black stroke, black fill
@@ -455,6 +487,12 @@ class RJPES_PDF {
             }
         }
         
+        // Try to embed author photo if configured
+        $author_photo_info = null;
+        if (isset($photo_to_embed) && $photo_to_embed) {
+            $author_photo_info = $this->embed_jpeg_image($photo_to_embed);
+        }
+        
         // Font 1 (Regular)
         $font1_id = $this->new_object();
         $this->write("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\n");
@@ -467,8 +505,16 @@ class RJPES_PDF {
 
         // Resources object containing fonts
         $resources_id = $this->new_object();
+        $xobjects = [];
         if ($img_info) {
-            $this->write("<< /Font << /F1 " . $font1_id . " 0 R /F2 " . $font2_id . " 0 R >> /XObject << /SigImg " . $img_info['id'] . " 0 R >> >>\n");
+            $xobjects[] = "/SigImg " . $img_info['id'] . " 0 R";
+        }
+        if ($author_photo_info) {
+            $xobjects[] = "/AuthorPhoto " . $author_photo_info['id'] . " 0 R";
+        }
+        
+        if (!empty($xobjects)) {
+            $this->write("<< /Font << /F1 " . $font1_id . " 0 R /F2 " . $font2_id . " 0 R >> /XObject << " . implode(" ", $xobjects) . " >> >>\n");
         } else {
             $this->write("<< /Font << /F1 " . $font1_id . " 0 R /F2 " . $font2_id . " 0 R >> >>\n");
         }

@@ -97,24 +97,83 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    if ($upload_ok && $new_file_uploaded) {
-        // Convert uploaded doc/docx to PDF
-        require_once __DIR__ . '/../includes/word_helper.php';
-        require_once __DIR__ . '/../includes/pdf_helper.php';
-
-        $extracted_content = '';
-        if ($file_ext === 'docx') {
-            $extracted_content = rjpes_read_docx($dest_path);
-        } elseif ($file_ext === 'doc') {
-            $extracted_content = rjpes_read_doc($dest_path);
-        }
-
-        if ($extracted_content === false || empty($extracted_content)) {
-            $message = "Failed to extract text from the uploaded document. Please check the file format and try again.";
-            $message_type = "danger";
-            $upload_ok = false;
-            @unlink($dest_path);
+    // Photo Upload handling
+    $author_photo_path = null;
+    $new_photo_uploaded = false;
+    
+    if ($upload_ok) {
+        if (isset($_FILES['author_photo']) && $_FILES['author_photo']['error'] === UPLOAD_ERR_OK) {
+            $photo_name = $_FILES['author_photo']['name'];
+            $photo_tmp = $_FILES['author_photo']['tmp_name'];
+            $photo_ext = strtolower(pathinfo($photo_name, PATHINFO_EXTENSION));
+            
+            $allowed_photo_exts = ['jpg', 'jpeg'];
+            if (!in_array($photo_ext, $allowed_photo_exts)) {
+                $message = "Invalid photo type. Only JPG and JPEG files are allowed.";
+                $message_type = "danger";
+                $upload_ok = false;
+            } else {
+                $upload_dir = __DIR__ . '/../uploads/';
+                if (!file_exists($upload_dir)) {
+                    mkdir($upload_dir, 0777, true);
+                }
+                
+                $new_photo_name = 'author_photo_' . time() . '_' . rand(1000, 9999) . '.' . $photo_ext;
+                $photo_dest_path = $upload_dir . $new_photo_name;
+                
+                if (move_uploaded_file($photo_tmp, $photo_dest_path)) {
+                    $author_photo_path = 'uploads/' . $new_photo_name;
+                    $new_photo_uploaded = true;
+                } else {
+                    $message = "Failed to upload author photo. Check server permissions.";
+                    $message_type = "danger";
+                    $upload_ok = false;
+                }
+            }
         } else {
+            if ($is_edit) {
+                $author_photo_path = $edit_journal['author_photo'] ?? null;
+            } else {
+                $author_photo_path = null;
+            }
+        }
+    }
+
+    if ($upload_ok) {
+        $regenerate_pdf = false;
+        
+        if ($new_file_uploaded) {
+            $regenerate_pdf = true;
+            // Convert uploaded doc/docx to PDF
+            require_once __DIR__ . '/../includes/word_helper.php';
+            
+            $extracted_content = '';
+            if ($file_ext === 'docx') {
+                $extracted_content = rjpes_read_docx($dest_path);
+            } elseif ($file_ext === 'doc') {
+                $extracted_content = rjpes_read_doc($dest_path);
+            }
+    
+            if ($extracted_content === false || empty($extracted_content)) {
+                $message = "Failed to extract text from the uploaded document. Please check the file format and try again.";
+                $message_type = "danger";
+                $upload_ok = false;
+                @unlink($dest_path);
+                if ($new_photo_uploaded && !empty($author_photo_path)) {
+                    @unlink(__DIR__ . '/../' . $author_photo_path);
+                }
+            } else {
+                $content = $extracted_content; // Update content to be the extracted text
+                // Delete the word file from the server
+                @unlink($dest_path);
+            }
+        } elseif ($is_edit && ($new_photo_uploaded || $_POST['title'] !== $edit_journal['title'] || $_POST['abstract'] !== $edit_journal['abstract'] || $_POST['content'] !== $edit_journal['content'] || $_POST['subject_domain'] !== $edit_journal['subject_domain'])) {
+            $regenerate_pdf = true;
+        }
+        
+        if ($upload_ok && ($regenerate_pdf || !$is_edit)) {
+            require_once __DIR__ . '/../includes/pdf_helper.php';
+            
             // Determine volume and issue for header/footer
             $latest_vol = '20';
             $latest_iss = '1';
@@ -125,7 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($row['setting_key'] === 'current_issue') $latest_iss = $row['setting_value'];
                 }
             } catch (PDOException $e) {}
-
+    
             // Create the data array for PDF generator
             $journal_pdf_data = [
                 'title' => $title,
@@ -133,32 +192,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'subject_domain' => $subject_domain,
                 'journal_number' => $journal_number,
                 'abstract' => $abstract,
-                'content' => $extracted_content,
+                'content' => $content,
                 'volume' => $latest_vol,
                 'issue' => $latest_iss,
-                'published_at' => date('Y-m-d H:i:s')
+                'published_at' => date('Y-m-d H:i:s'),
+                'author_photo' => $author_photo_path
             ];
-
+    
             // Generate PDF
             $pdf_generator = new RJPES_PDF();
             $pdf_bytes = $pdf_generator->generate($journal_pdf_data);
-
+    
             // Save PDF to server
             $pdf_filename = 'manuscript_' . time() . '_' . rand(1000, 9999) . '.pdf';
             $pdf_dest_path = $upload_dir . $pdf_filename;
-
+    
             if (file_put_contents($pdf_dest_path, $pdf_bytes) !== false) {
+                // Delete old PDF file if it exists and we are replacing it
+                if ($is_edit && !empty($edit_journal['manuscript_file'])) {
+                    @unlink(__DIR__ . '/../' . $edit_journal['manuscript_file']);
+                }
                 // Update variables to save PDF path instead of word path
                 $file_path = 'uploads/' . $pdf_filename;
-                $content = $extracted_content; // Update content to be the extracted text
-                
-                // Delete the word file from the server
-                @unlink($dest_path);
             } else {
                 $message = "Failed to convert document to PDF. Check server permissions.";
                 $message_type = "danger";
                 $upload_ok = false;
-                @unlink($dest_path);
+                if ($new_photo_uploaded && !empty($author_photo_path)) {
+                    @unlink(__DIR__ . '/../' . $author_photo_path);
+                }
             }
         }
     }
@@ -171,8 +233,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $pdo->beginTransaction();
 
-                $stmt = $pdo->prepare("UPDATE journals SET title = ?, abstract = ?, content = ?, subject_domain = ?, manuscript_file = ?, status = 'under_review', updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-                $stmt->execute([$title, $abstract, $content, $subject_domain, $file_path, $edit_journal['id']]);
+                $stmt = $pdo->prepare("UPDATE journals SET title = ?, abstract = ?, content = ?, subject_domain = ?, manuscript_file = ?, author_photo = ?, status = 'under_review', updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+                $stmt->execute([$title, $abstract, $content, $subject_domain, $file_path, $author_photo_path, $edit_journal['id']]);
                 
                 // Keep the assignment and set status back to 'assigned' so the verifier can review again
                 $reset_assignment = $pdo->prepare("UPDATE reviewer_assignments SET status = 'assigned' WHERE journal_id = ?");
@@ -188,6 +250,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $ins_ver->execute([$edit_journal['id'], $next_version, $file_path, $author_notes ?: null]);
 
                 $pdo->commit();
+                
+                // Delete old photo if a new one is uploaded and DB updates successfully
+                if ($new_photo_uploaded && !empty($edit_journal['author_photo'])) {
+                    @unlink(__DIR__ . '/../' . $edit_journal['author_photo']);
+                }
                 
                 // Send email notifications
                 try {
@@ -215,6 +282,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($pdo->inTransaction()) $pdo->rollBack();
                 $message = "Database update failed: " . $e->getMessage();
                 $message_type = "danger";
+                if ($new_photo_uploaded && !empty($author_photo_path)) {
+                    @unlink(__DIR__ . '/../' . $author_photo_path);
+                }
             }
         } else {
             // Create new submission
@@ -224,8 +294,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $pdo->beginTransaction();
                 
-                $stmt = $pdo->prepare("INSERT INTO journals (author_id, title, abstract, content, subject_domain, manuscript_file, journal_number, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'submitted_waiting_review')");
-                $stmt->execute([$author_id, $title, $abstract, $content, $subject_domain, $file_path, $journal_number]);
+                $stmt = $pdo->prepare("INSERT INTO journals (author_id, title, abstract, content, subject_domain, manuscript_file, author_photo, journal_number, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'submitted_waiting_review')");
+                $stmt->execute([$author_id, $title, $abstract, $content, $subject_domain, $file_path, $author_photo_path, $journal_number]);
                 $new_journal_id = $pdo->lastInsertId();
 
                 // Record as Version 1
@@ -254,6 +324,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($pdo->inTransaction()) $pdo->rollBack();
                 $message = "Database insertion failed: " . $e->getMessage();
                 $message_type = "danger";
+                if ($new_photo_uploaded && !empty($author_photo_path)) {
+                    @unlink(__DIR__ . '/../' . $author_photo_path);
+                }
             }
         }
     }
@@ -337,6 +410,20 @@ require_once __DIR__ . '/../includes/header.php';
                     <?php if ($is_edit): ?>
                         <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;">
                             Current file: <a href="<?php echo $path_prefix . $edit_journal['manuscript_file']; ?>" target="_blank"><?php echo basename($edit_journal['manuscript_file']); ?></a>. Leave blank to keep the same file.
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <div class="form-group" style="margin-top: 1.5rem;">
+                    <label for="author_photo">Author's Photo (JPG or JPEG only)</label>
+                    <input type="file" name="author_photo" id="author_photo" accept=".jpg,.jpeg" class="form-control">
+                    <small style="display: block; margin-top: 5px; color: #7f8c8d; font-size: 0.82rem;">
+                        <strong>⚠️ Format Requirement:</strong> The photo must be a JPG or JPEG file. This image will be printed on the cover page of the generated PDF.
+                    </small>
+                    <?php if ($is_edit && !empty($edit_journal['author_photo'])): ?>
+                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 8px; display: flex; align-items: center; gap: 10px;">
+                            <span>Current photo:</span>
+                            <img src="<?php echo $path_prefix . $edit_journal['author_photo']; ?>" alt="Author Photo" style="max-width: 60px; max-height: 60px; border-radius: 4px; border: 1px solid var(--border-color); object-fit: cover;">
                         </div>
                     <?php endif; ?>
                 </div>
