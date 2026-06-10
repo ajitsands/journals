@@ -7,12 +7,13 @@ require_once __DIR__ . '/config/db.php';
 $domains = [
     "Physical Education",
     "Sports Science",
-    "Yoga",
-    "Group Dynamics",
-    "Health Education",
-    "Nutrition",
-    "Physical Fitness",
-    "Sports and Allied Subjects"
+    "Sports and Society",
+    "Kinesiology and Biomechanics",
+    "Exercise Physiology",
+    "Diet, Nutrition and Drugs",
+    "Health, Fitness, Yoga and Wellness",
+    "Sports Equipment and Facilities",
+    "Sports Training and Competitions"
 ];
 
 // Read filters & pagination

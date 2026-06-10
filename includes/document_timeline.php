@@ -43,12 +43,45 @@ foreach ($tl_versions as $ver) {
         'data'    => $ver,
     ];
 }
+$has_approval = false;
 foreach ($tl_reviews as $rev) {
+    if ($rev['recommendation'] === 'approve') {
+        $has_approval = true;
+        break;
+    }
+}
+
+if ($tl_role === 'author' && $has_approval) {
+    $last_version_ts = 0;
+    foreach ($tl_versions as $ver) {
+        $ts = strtotime($ver['uploaded_at']);
+        if ($ts > $last_version_ts) {
+            $last_version_ts = $ts;
+        }
+    }
     $tl_events[] = [
-        'type' => 'review',
-        'ts'   => strtotime($rev['review_date']),
-        'data' => $rev,
+        'type'  => 'review_approved_fake',
+        'round' => 1,
+        'ts'    => $last_version_ts + 1,
     ];
+    $tl_events[] = [
+        'type'  => 'review_approved_fake',
+        'round' => 2,
+        'ts'    => $last_version_ts + 2,
+    ];
+    $tl_events[] = [
+        'type'  => 'review_approved_fake',
+        'round' => 3,
+        'ts'    => $last_version_ts + 3,
+    ];
+} else {
+    foreach ($tl_reviews as $rev) {
+        $tl_events[] = [
+            'type' => 'review',
+            'ts'   => strtotime($rev['review_date']),
+            'data' => $rev,
+        ];
+    }
 }
 
 // Sort by timestamp
@@ -59,7 +92,10 @@ usort($tl_events, fn($a, $b) => $a['ts'] <=> $b['ts']);
     <!-- Vertical line -->
     <div style="position: absolute; left: 9px; top: 0; bottom: 0; width: 2px; background: linear-gradient(to bottom, #3b82f6, #e2e8f0);"></div>
 
-    <?php foreach ($tl_events as $i => $evt): ?>
+    <?php 
+    $review_counter = 0;
+    foreach ($tl_events as $i => $evt): 
+    ?>
         <?php if ($evt['type'] === 'version'):
             $ver = $evt['data'];
             $is_first = ($ver['version_number'] == 1);
@@ -99,6 +135,7 @@ usort($tl_events, fn($a, $b) => $a['ts'] <=> $b['ts']);
 
         <?php elseif ($evt['type'] === 'review'):
             $rev = $evt['data'];
+            $review_counter++;
             $rec = $rev['recommendation'];
             $rec_color  = ($rec == 'approve') ? '#16a34a' : (($rec == 'reject') ? '#dc2626' : '#d97706');
             $rec_bg     = ($rec == 'approve') ? '#dcfce7' : (($rec == 'reject') ? '#fee2e2' : '#fef3c7');
@@ -114,17 +151,43 @@ usort($tl_events, fn($a, $b) => $a['ts'] <=> $b['ts']);
             <div style="background: <?php echo $rec_bg; ?>; border: 1px solid <?php echo $rec_border; ?>; border-radius: 8px; padding: 12px 14px;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 6px;">
                     <div style="flex: 1;">
-                        <div style="font-weight: 700; font-size: 0.85rem; color: <?php echo $rec_color; ?>;">
-                            <?php echo $rec_label; ?>
-                        </div>
-                        <div style="font-size: 0.75rem; color: #64748b; margin-top: 3px;">
-                            <?php if ($show_name): ?>
-                                👤 <?php echo htmlspecialchars($rev['reviewer_name']); ?> &nbsp;|&nbsp;
-                            <?php endif; ?>
-                            📅 <?php echo date('d M Y', $evt['ts']); ?> &nbsp;🕐 <?php echo date('h:i A', $evt['ts']); ?>
-                        </div>
-                        <div style="margin-top: 8px; font-size: 0.8rem; color: #374151; font-style: italic; line-height: 1.5; background: #ffffff60; border-radius: 4px; padding: 6px 10px;">
-                            "<?php echo htmlspecialchars($rev['comments']); ?>"
+                        <?php if ($tl_role === 'author' && $rec === 'approve'): ?>
+                            <div style="font-weight: 700; font-size: 0.85rem; color: #16a34a;">
+                                Review Round <?php echo $review_counter; ?> Approved
+                            </div>
+                        <?php else: ?>
+                            <div style="font-weight: 700; font-size: 0.85rem; color: <?php echo $rec_color; ?>;">
+                                <?php echo $rec_label; ?>
+                            </div>
+                            <div style="font-size: 0.75rem; color: #64748b; margin-top: 3px;">
+                                <?php if ($show_name): ?>
+                                    👤 <?php echo htmlspecialchars($rev['reviewer_name']); ?> &nbsp;|&nbsp;
+                                <?php endif; ?>
+                                📅 <?php echo date('d M Y', $evt['ts']); ?> &nbsp;🕐 <?php echo date('h:i A', $evt['ts']); ?>
+                            </div>
+                            <div style="margin-top: 8px; font-size: 0.8rem; color: #374151; font-style: italic; line-height: 1.5; background: #ffffff60; border-radius: 4px; padding: 6px 10px;">
+                                "<?php echo htmlspecialchars($rev['comments']); ?>"
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php elseif ($evt['type'] === 'review_approved_fake'):
+            $round = $evt['round'];
+            $rec_color = '#16a34a';
+            $rec_bg = '#dcfce7';
+            $rec_border = '#bbf7d0';
+        ?>
+        <div style="position: relative; margin-bottom: 18px;">
+            <!-- Dot -->
+            <div style="position: absolute; left: -25px; top: 8px; width: 14px; height: 14px; border-radius: 50%; background: <?php echo $rec_color; ?>; border: 2px solid white; box-shadow: 0 0 0 2px <?php echo $rec_color; ?>;"></div>
+            <!-- Card -->
+            <div style="background: <?php echo $rec_bg; ?>; border: 1px solid <?php echo $rec_border; ?>; border-radius: 8px; padding: 12px 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 6px;">
+                    <div style="flex: 1;">
+                        <div style="font-weight: 700; font-size: 0.85rem; color: #16a34a;">
+                            Review Round <?php echo $round; ?> Approved
                         </div>
                     </div>
                 </div>

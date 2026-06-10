@@ -33,18 +33,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $content = $_POST['content'] ?? '';
     $subject_domain = sanitize($_POST['subject_domain']);
     
+    // Pre-generate unique Journal Number for new submissions
+    $journal_number = "";
+    if (!$is_edit) {
+        $is_unique = false;
+        while (!$is_unique) {
+            $random_num = rand(1000, 9999);
+            $journal_number = "RJPES-2026-" . $random_num;
+            
+            $check_stmt = $pdo->prepare("SELECT id FROM journals WHERE journal_number = ?");
+            $check_stmt->execute([$journal_number]);
+            if (!$check_stmt->fetch()) {
+                $is_unique = true;
+            }
+        }
+    } else {
+        $journal_number = $edit_journal['journal_number'];
+    }
+
     // File Upload handling
     $upload_ok = true;
     $file_path = "";
+    $new_file_uploaded = false;
     
     if (isset($_FILES['manuscript']) && $_FILES['manuscript']['error'] === UPLOAD_ERR_OK) {
+        $new_file_uploaded = true;
         $file_name = $_FILES['manuscript']['name'];
         $file_tmp = $_FILES['manuscript']['tmp_name'];
         $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
         
-        $allowed_exts = ['pdf', 'doc', 'docx', 'txt'];
+        $allowed_exts = ['doc', 'docx'];
         if (!in_array($file_ext, $allowed_exts)) {
-            $message = "Invalid file type. Only PDF, DOC, DOCX, and TXT files are allowed.";
+            $message = "Invalid file type. Only DOC and DOCX files are allowed.";
             $message_type = "danger";
             $upload_ok = false;
         } else {
@@ -74,6 +94,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = "Please upload your manuscript file.";
             $message_type = "danger";
             $upload_ok = false;
+        }
+    }
+
+    if ($upload_ok && $new_file_uploaded) {
+        // Convert uploaded doc/docx to PDF
+        require_once __DIR__ . '/../includes/word_helper.php';
+        require_once __DIR__ . '/../includes/pdf_helper.php';
+
+        $extracted_content = '';
+        if ($file_ext === 'docx') {
+            $extracted_content = rjpes_read_docx($dest_path);
+        } elseif ($file_ext === 'doc') {
+            $extracted_content = rjpes_read_doc($dest_path);
+        }
+
+        if ($extracted_content === false || empty($extracted_content)) {
+            $message = "Failed to extract text from the uploaded document. Please check the file format and try again.";
+            $message_type = "danger";
+            $upload_ok = false;
+            @unlink($dest_path);
+        } else {
+            // Determine volume and issue for header/footer
+            $latest_vol = '20';
+            $latest_iss = '1';
+            try {
+                $set_stmt = $pdo->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('current_volume', 'current_issue')");
+                while ($row = $set_stmt->fetch()) {
+                    if ($row['setting_key'] === 'current_volume') $latest_vol = $row['setting_value'];
+                    if ($row['setting_key'] === 'current_issue') $latest_iss = $row['setting_value'];
+                }
+            } catch (PDOException $e) {}
+
+            // Create the data array for PDF generator
+            $journal_pdf_data = [
+                'title' => $title,
+                'author_name' => $user['fullname'],
+                'subject_domain' => $subject_domain,
+                'journal_number' => $journal_number,
+                'abstract' => $abstract,
+                'content' => $extracted_content,
+                'volume' => $latest_vol,
+                'issue' => $latest_iss,
+                'published_at' => date('Y-m-d H:i:s')
+            ];
+
+            // Generate PDF
+            $pdf_generator = new RJPES_PDF();
+            $pdf_bytes = $pdf_generator->generate($journal_pdf_data);
+
+            // Save PDF to server
+            $pdf_filename = 'manuscript_' . time() . '_' . rand(1000, 9999) . '.pdf';
+            $pdf_dest_path = $upload_dir . $pdf_filename;
+
+            if (file_put_contents($pdf_dest_path, $pdf_bytes) !== false) {
+                // Update variables to save PDF path instead of word path
+                $file_path = 'uploads/' . $pdf_filename;
+                $content = $extracted_content; // Update content to be the extracted text
+                
+                // Delete the word file from the server
+                @unlink($dest_path);
+            } else {
+                $message = "Failed to convert document to PDF. Check server permissions.";
+                $message_type = "danger";
+                $upload_ok = false;
+                @unlink($dest_path);
+            }
         }
     }
 
@@ -133,19 +219,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             // Create new submission
             try {
-                // Generate unique Journal Number
-                $is_unique = false;
-                $journal_number = "";
-                while (!$is_unique) {
-                    $random_num = rand(1000, 9999);
-                    $journal_number = "RJPES-2026-" . $random_num;
-                    
-                    $check_stmt = $pdo->prepare("SELECT id FROM journals WHERE journal_number = ?");
-                    $check_stmt->execute([$journal_number]);
-                    if (!$check_stmt->fetch()) {
-                        $is_unique = true;
-                    }
-                }
+                // Journal number is already pre-generated at the top
+                $is_unique = true;
 
                 $pdo->beginTransaction();
                 
@@ -233,12 +308,13 @@ require_once __DIR__ . '/../includes/header.php';
                         <option value="">Select Domain...</option>
                         <option value="Physical Education" <?php echo ($is_edit && $edit_journal['subject_domain'] == 'Physical Education') ? 'selected' : ''; ?>>Physical Education</option>
                         <option value="Sports Science" <?php echo ($is_edit && $edit_journal['subject_domain'] == 'Sports Science') ? 'selected' : ''; ?>>Sports Science</option>
-                        <option value="Yoga" <?php echo ($is_edit && $edit_journal['subject_domain'] == 'Yoga') ? 'selected' : ''; ?>>Yoga</option>
-                        <option value="Group Dynamics" <?php echo ($is_edit && $edit_journal['subject_domain'] == 'Group Dynamics') ? 'selected' : ''; ?>>Group Dynamics</option>
-                        <option value="Health Education" <?php echo ($is_edit && $edit_journal['subject_domain'] == 'Health Education') ? 'selected' : ''; ?>>Health Education</option>
-                        <option value="Nutrition" <?php echo ($is_edit && $edit_journal['subject_domain'] == 'Nutrition') ? 'selected' : ''; ?>>Nutrition</option>
-                        <option value="Physical Fitness" <?php echo ($is_edit && $edit_journal['subject_domain'] == 'Physical Fitness') ? 'selected' : ''; ?>>Physical Fitness</option>
-                        <option value="Sports and Allied Subjects" <?php echo ($is_edit && $edit_journal['subject_domain'] == 'Sports and Allied Subjects') ? 'selected' : ''; ?>>Sports and Allied Subjects</option>
+                        <option value="Sports and Society" <?php echo ($is_edit && $edit_journal['subject_domain'] == 'Sports and Society') ? 'selected' : ''; ?>>Sports and Society</option>
+                        <option value="Kinesiology and Biomechanics" <?php echo ($is_edit && $edit_journal['subject_domain'] == 'Kinesiology and Biomechanics') ? 'selected' : ''; ?>>Kinesiology and Biomechanics</option>
+                        <option value="Exercise Physiology" <?php echo ($is_edit && $edit_journal['subject_domain'] == 'Exercise Physiology') ? 'selected' : ''; ?>>Exercise Physiology</option>
+                        <option value="Diet, Nutrition and Drugs" <?php echo ($is_edit && $edit_journal['subject_domain'] == 'Diet, Nutrition and Drugs') ? 'selected' : ''; ?>>Diet, Nutrition and Drugs</option>
+                        <option value="Health, Fitness, Yoga and Wellness" <?php echo ($is_edit && $edit_journal['subject_domain'] == 'Health, Fitness, Yoga and Wellness') ? 'selected' : ''; ?>>Health, Fitness, Yoga and Wellness</option>
+                        <option value="Sports Equipment and Facilities" <?php echo ($is_edit && $edit_journal['subject_domain'] == 'Sports Equipment and Facilities') ? 'selected' : ''; ?>>Sports Equipment and Facilities</option>
+                        <option value="Sports Training and Competitions" <?php echo ($is_edit && $edit_journal['subject_domain'] == 'Sports Training and Competitions') ? 'selected' : ''; ?>>Sports Training and Competitions</option>
                     </select>
                 </div>
 
@@ -253,10 +329,10 @@ require_once __DIR__ . '/../includes/header.php';
                 </div>
 
                 <div class="form-group">
-                    <label for="manuscript">Manuscript File (PDF, DOCX, DOC, or TXT)</label>
-                    <input type="file" name="manuscript" id="manuscript" class="form-control" <?php echo $is_edit ? '' : 'required'; ?>>
+                    <label for="manuscript">Manuscript File (DOCX or DOC)</label>
+                    <input type="file" name="manuscript" id="manuscript" accept=".doc,.docx" class="form-control" <?php echo $is_edit ? '' : 'required'; ?>>
                     <small style="display: block; margin-top: 5px; color: #7f8c8d; font-size: 0.82rem;">
-                        <strong>⚠️ Format Requirement:</strong> The manuscript must comply with the <strong>IMRAD structure</strong> and <strong>APA 7th edition format</strong>.
+                        <strong>⚠️ Format Requirement:</strong> The manuscript must be uploaded as a DOCX or DOC file. It will be converted into a PDF automatically, containing standard header, footer, and page numbers.
                     </small>
                     <?php if ($is_edit): ?>
                         <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;">

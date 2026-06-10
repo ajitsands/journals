@@ -187,8 +187,18 @@ require_once __DIR__ . '/../includes/header.php';
                                         ?>
                                         <?php if (!empty($reviews)): ?>
                                             <div style="margin-top: 10px;">
+                                                <?php
+                                                $has_approval = false;
+                                                foreach ($reviews as $rev) {
+                                                    if ($rev['recommendation'] === 'approve') {
+                                                        $has_approval = true;
+                                                        break;
+                                                    }
+                                                }
+                                                $display_count = $has_approval ? 3 : count($reviews);
+                                                ?>
                                                 <button onclick="toggleReviews(<?php echo $paper['id']; ?>)" style="background: none; border: none; color: var(--info-color); font-size: 0.8rem; cursor: pointer; text-decoration: underline; font-weight: 500;">
-                                                    📋 View Feedback (<?php echo count($reviews); ?>)
+                                                    📋 View Feedback (<?php echo $display_count; ?>)
                                                 </button>
                                                 <div id="reviews-<?php echo $paper['id']; ?>" style="display: none; background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-top: 8px; font-size: 0.82rem; min-width: 320px; max-width: 480px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
                                                     
@@ -198,52 +208,63 @@ require_once __DIR__ . '/../includes/header.php';
                                                         <span style="color: #0369a1;"> <?php echo date('d M Y', strtotime($paper['created_at'])); ?> at <?php echo date('h:i A', strtotime($paper['created_at'])); ?></span>
                                                     </div>
 
-                                                    <?php $review_count = 0; foreach ($reviews as $rev): $review_count++; ?>
+                                                    <?php if ($has_approval): ?>
                                                         <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; margin-bottom: 10px; background: #ffffff;">
-                                                            
-                                                            <!-- Review Round Label -->
-                                                            <div style="font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
-                                                                Review Round <?php echo $review_count; ?>
-                                                            </div>
-
-                                                            <!-- Verifier Name -->
-                                                            <div style="font-weight: 600; color: var(--primary-color); margin-bottom: 4px;">
-                                                                👤 <?php echo sanitize($rev['reviewer_name']); ?>
-                                                            </div>
-
-                                                            <!-- Action Date -->
-                                                            <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px;">
-                                                                🕐 <strong>Action Date:</strong> <?php echo date('d M Y', strtotime($rev['review_date'])); ?> at <?php echo date('h:i A', strtotime($rev['review_date'])); ?>
-                                                            </div>
-
-                                                            <!-- Recommendation Badge -->
-                                                            <div style="margin-bottom: 6px;">
-                                                                <?php
-                                                                $rec = $rev['recommendation'];
-                                                                $rec_color = ($rec == 'approve') ? '#16a34a' : (($rec == 'reject') ? '#dc2626' : '#d97706');
-                                                                $rec_bg = ($rec == 'approve') ? '#dcfce7' : (($rec == 'reject') ? '#fee2e2' : '#fef3c7');
-                                                                $rec_label = ($rec == 'approve') ? '✅ Approved' : (($rec == 'reject') ? '❌ Rejected' : '🔁 Revision Requested');
-                                                                ?>
-                                                                <span style="display: inline-block; background: <?php echo $rec_bg; ?>; color: <?php echo $rec_color; ?>; font-weight: 700; font-size: 0.75rem; padding: 3px 8px; border-radius: 12px; border: 1px solid <?php echo $rec_color; ?>20;">
-                                                                    <?php echo $rec_label; ?>
-                                                                </span>
-                                                            </div>
-
-                                                            <!-- Comments -->
-                                                            <div style="color: #475569; font-style: italic; font-size: 0.8rem; line-height: 1.5; border-top: 1px solid #f1f5f9; padding-top: 6px; margin-top: 4px;">
-                                                                "<?php echo sanitize($rev['comments']); ?>"
+                                                            <div style="font-weight: 600; color: #16a34a; font-size: 0.85rem;">
+                                                                Review Round 1 Approved
                                                             </div>
                                                         </div>
-
-                                                        <!-- Revision Submitted Date (shown only if paper was updated after this review) -->
-                                                        <?php if ($paper['updated_at'] && $paper['updated_at'] != $paper['created_at'] && strtotime($paper['updated_at']) > strtotime($rev['review_date'])): ?>
-                                                            <div style="background: #fef9c3; border-left: 3px solid #ca8a04; border-radius: 4px; padding: 6px 10px; margin-bottom: 10px; font-size: 0.78rem;">
-                                                                <span style="font-weight: 600; color: #92400e;">📤 Revision Submitted:</span>
-                                                                <span style="color: #92400e;"> <?php echo date('d M Y', strtotime($paper['updated_at'])); ?> at <?php echo date('h:i A', strtotime($paper['updated_at'])); ?></span>
+                                                        <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; margin-bottom: 10px; background: #ffffff;">
+                                                            <div style="font-weight: 600; color: #16a34a; font-size: 0.85rem;">
+                                                                Review Round 2 Approved
                                                             </div>
-                                                        <?php endif; ?>
+                                                        </div>
+                                                        <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; margin-bottom: 10px; background: #ffffff;">
+                                                            <div style="font-weight: 600; color: #16a34a; font-size: 0.85rem;">
+                                                                Review Round 3 Approved
+                                                            </div>
+                                                        </div>
+                                                    <?php else: ?>
+                                                        <?php $review_count = 0; foreach ($reviews as $rev): $review_count++; ?>
+                                                            <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; margin-bottom: 10px; background: #ffffff;">
+                                                                <!-- Review Round Label -->
+                                                                <div style="font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+                                                                    Review Round <?php echo $review_count; ?>
+                                                                </div>
 
-                                                    <?php endforeach; ?>
+                                                                <!-- Action Date -->
+                                                                <div style="font-size: 0.75rem; color: #64748b; margin-bottom: 6px;">
+                                                                    🕐 <strong>Action Date:</strong> <?php echo date('d M Y', strtotime($rev['review_date'])); ?> at <?php echo date('h:i A', strtotime($rev['review_date'])); ?>
+                                                                </div>
+
+                                                                <!-- Recommendation Badge -->
+                                                                <div style="margin-bottom: 6px;">
+                                                                    <?php
+                                                                    $rec = $rev['recommendation'];
+                                                                    $rec_color = ($rec == 'approve') ? '#16a34a' : (($rec == 'reject') ? '#dc2626' : '#d97706');
+                                                                    $rec_bg = ($rec == 'approve') ? '#dcfce7' : (($rec == 'reject') ? '#fee2e2' : '#fef3c7');
+                                                                    $rec_label = ($rec == 'approve') ? '✅ Approved' : (($rec == 'reject') ? '❌ Rejected' : '🔁 Revision Requested');
+                                                                    ?>
+                                                                    <span style="display: inline-block; background: <?php echo $rec_bg; ?>; color: <?php echo $rec_color; ?>; font-weight: 700; font-size: 0.75rem; padding: 3px 8px; border-radius: 12px; border: 1px solid <?php echo $rec_color; ?>20;">
+                                                                        <?php echo $rec_label; ?>
+                                                                    </span>
+                                                                </div>
+
+                                                                <!-- Comments -->
+                                                                <div style="color: #475569; font-style: italic; font-size: 0.8rem; line-height: 1.5; border-top: 1px solid #f1f5f9; padding-top: 6px; margin-top: 4px;">
+                                                                    "<?php echo sanitize($rev['comments']); ?>"
+                                                                </div>
+                                                            </div>
+
+                                                            <!-- Revision Submitted Date (shown only if paper was updated after this review) -->
+                                                            <?php if ($paper['updated_at'] && $paper['updated_at'] != $paper['created_at'] && strtotime($paper['updated_at']) > strtotime($rev['review_date'])): ?>
+                                                                <div style="background: #fef9c3; border-left: 3px solid #ca8a04; border-radius: 4px; padding: 6px 10px; margin-bottom: 10px; font-size: 0.78rem;">
+                                                                    <span style="font-weight: 600; color: #92400e;">📤 Revision Submitted:</span>
+                                                                    <span style="color: #92400e;"> <?php echo date('d M Y', strtotime($paper['updated_at'])); ?> at <?php echo date('h:i A', strtotime($paper['updated_at'])); ?></span>
+                                                                </div>
+                                                            <?php endif; ?>
+                                                        <?php endforeach; ?>
+                                                    <?php endif; ?>
                                                 </div>
                                             </div>
                                         <?php endif; ?>

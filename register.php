@@ -190,12 +190,13 @@ main { position: relative; z-index: 1; }
                     <option value="">Select Domain...</option>
                     <option value="Physical Education">Physical Education</option>
                     <option value="Sports Science">Sports Science</option>
-                    <option value="Yoga">Yoga</option>
-                    <option value="Group Dynamics">Group Dynamics</option>
-                    <option value="Health Education">Health Education</option>
-                    <option value="Nutrition">Nutrition</option>
-                    <option value="Physical Fitness">Physical Fitness</option>
-                    <option value="Sports and Allied Subjects">Sports and Allied Subjects</option>
+                    <option value="Sports and Society">Sports and Society</option>
+                    <option value="Kinesiology and Biomechanics">Kinesiology and Biomechanics</option>
+                    <option value="Exercise Physiology">Exercise Physiology</option>
+                    <option value="Diet, Nutrition and Drugs">Diet, Nutrition and Drugs</option>
+                    <option value="Health, Fitness, Yoga and Wellness">Health, Fitness, Yoga and Wellness</option>
+                    <option value="Sports Equipment and Facilities">Sports Equipment and Facilities</option>
+                    <option value="Sports Training and Competitions">Sports Training and Competitions</option>
                 </select>
             </div>
 

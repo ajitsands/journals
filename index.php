@@ -215,7 +215,7 @@ try {
                 
                 <div class="domain-grid">
                     <div class="domain-item">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"/></svg>
                         Physical Education
                     </div>
                     <div class="domain-item">
@@ -223,28 +223,32 @@ try {
                         Sports Science
                     </div>
                     <div class="domain-item">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                        Yoga
-                    </div>
-                    <div class="domain-item">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                        Group Dynamics
+                        Sports and Society
                     </div>
                     <div class="domain-item">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                        Health Education
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                        Kinesiology and Biomechanics
                     </div>
                     <div class="domain-item">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-                        Nutrition
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                        Exercise Physiology
                     </div>
                     <div class="domain-item">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
-                        Physical Fitness
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg>
+                        Diet, Nutrition and Drugs
                     </div>
                     <div class="domain-item">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                        Sports & Allied Subjects
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                        Health, Fitness, Yoga and Wellness
+                    </div>
+                    <div class="domain-item">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                        Sports Equipment and Facilities
+                    </div>
+                    <div class="domain-item">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34"/><path d="M12 2a7.7 7.7 0 0 1 7.54 8H4.46A7.7 7.7 0 0 1 12 2z"/></svg>
+                        Sports Training and Competitions
                     </div>
                 </div>
             </div>
@@ -263,7 +267,7 @@ try {
                         <div class="workflow-badge">2</div>
                         <div class="workflow-content">
                             <h4>Submit Manuscript</h4>
-                            <p>Upload your draft manuscript in PDF/DOCX format (compliant with IMRAD structure and APA 7th edition format), adding title and abstract. A unique <strong>Journal Number</strong> will be assigned to your submission.</p>
+                            <p>Upload your draft manuscript in DOCX/DOC format. The system will automatically convert it into a PDF (with standard header, footer, and page numbers) for the portal. A unique <strong>Journal Number</strong> will be assigned to your submission.</p>
                         </div>
                     </div>
                     <div class="workflow-step">
@@ -313,9 +317,20 @@ try {
 
             <div class="card" style="border-left: 4px solid var(--accent-color);">
                 <h3 style="color: var(--primary-color); margin-bottom: 0.5rem; font-family: var(--font-heading); font-size: 1.2rem;">UGC Guidelines</h3>
-                <p style="font-size: 0.85rem;">
+                <p style="font-size: 0.85rem; margin-bottom: 1rem;">
                     RJPES follows the standard academic publishing guidelines for peer-reviewed journals. All research articles undergo double-blind peer review to maintain strict scientific standards.
                 </p>
+                <div style="margin-top: 1.25rem;">
+                    <a href="<?php echo $path_prefix; ?>guidelines/9678711_PUBLIC-NOTICE-CARE.pdf" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 600; padding: 10px 16px; border: 1px solid var(--primary-color); color: var(--primary-color); background: rgba(11, 34, 64, 0.03); border-radius: 6px; width: 100%; justify-content: center; transition: var(--transition);" onmouseover="this.style.background='var(--primary-color)'; this.style.color='white'; this.style.transform='translateY(-2px)';" onmouseout="this.style.background='rgba(11, 34, 64, 0.03)'; this.style.color='var(--primary-color)'; this.style.transform='none';">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="12" y1="18" x2="12" y2="12"></line>
+                            <polyline points="9 15 12 18 15 15"></polyline>
+                        </svg>
+                        UGC CARE Public Notice (PDF)
+                    </a>
+                </div>
             </div>
         </div>
     </div>

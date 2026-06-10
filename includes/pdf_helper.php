@@ -348,6 +348,11 @@ class RJPES_PDF {
         $content_stream .= "54 40 Td (" . $this->escape_text("RJPES Journal Portal | Official Publication of ACTPE, Calicut University") . ") Tj\n";
         $content_stream .= "ET\n";
         
+        $content_stream .= "BT\n";
+        $content_stream .= "/F1 8 Tf\n";
+        $content_stream .= "500 40 Td (" . $this->escape_text("Page 1") . ") Tj\n";
+        $content_stream .= "ET\n";
+        
         // Full Text Content
         if (!empty($content)) {
             // First page is complete with the cover page details and signature
@@ -358,7 +363,7 @@ class RJPES_PDF {
             $current_page_str .= "54 785 m 541 785 l S\n"; // Header line
             $current_page_str .= "BT\n";
             $current_page_str .= "/F2 9 Tf\n";
-            $current_page_str .= "54 792 Td (" . $this->escape_text("RJPES Vol. " . $volume . ", Issue " . $issue . " | " . $number) . ") Tj\n";
+            $current_page_str .= "54 792 Td (" . $this->escape_text("RJPES | Vol. " . $volume . ", Issue " . $issue . " (" . $month_year . ") | Journal No: " . $number) . ") Tj\n";
             $current_page_str .= "ET\n";
             
             $current_y = 750;
@@ -373,6 +378,7 @@ class RJPES_PDF {
             $current_y -= 20;
             $content_lines = $this->split_text_to_lines($content, 10, $max_width);
             
+            $page_num = 2;
             foreach ($content_lines as $c_line) {
                 if ($current_y < 70) { // Near page bottom
                     // Add footer to current page
@@ -381,14 +387,21 @@ class RJPES_PDF {
                     $current_page_str .= "54 40 Td (" . $this->escape_text("RJPES Journal Portal | Official Publication of ACTPE, Calicut University") . ") Tj\n";
                     $current_page_str .= "ET\n";
                     
+                    // Page number
+                    $current_page_str .= "BT\n";
+                    $current_page_str .= "/F1 8 Tf\n";
+                    $current_page_str .= "500 40 Td (" . $this->escape_text("Page " . $page_num) . ") Tj\n";
+                    $current_page_str .= "ET\n";
+                    
                     $pages_content[] = $current_page_str;
+                    $page_num++;
                     
                     // Reset page settings
                     $current_page_str = "0.5 w\n";
                     $current_page_str .= "54 785 m 541 785 l S\n"; // Header line
                     $current_page_str .= "BT\n";
                     $current_page_str .= "/F2 9 Tf\n";
-                    $current_page_str .= "54 792 Td (" . $this->escape_text("RJPES Vol. " . $volume . ", Issue " . $issue . " | " . $number) . ") Tj\n";
+                    $current_page_str .= "54 792 Td (" . $this->escape_text("RJPES | Vol. " . $volume . ", Issue " . $issue . " (" . $month_year . ") | Journal No: " . $number) . ") Tj\n";
                     $current_page_str .= "ET\n";
                     
                     $current_y = 750;
@@ -410,6 +423,12 @@ class RJPES_PDF {
             $current_page_str .= "BT\n";
             $current_page_str .= "/F1 8 Tf\n";
             $current_page_str .= "54 40 Td (" . $this->escape_text("RJPES Journal Portal | Official Publication of ACTPE, Calicut University") . ") Tj\n";
+            $current_page_str .= "ET\n";
+            
+            // Page number
+            $current_page_str .= "BT\n";
+            $current_page_str .= "/F1 8 Tf\n";
+            $current_page_str .= "500 40 Td (" . $this->escape_text("Page " . $page_num) . ") Tj\n";
             $current_page_str .= "ET\n";
             
             $pages_content[] = $current_page_str;
