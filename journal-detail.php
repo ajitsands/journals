@@ -148,12 +148,17 @@ require_once __DIR__ . '/includes/header.php';
         </h1>
 
         <div style="border-top: 1px solid var(--border-color); padding-top: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
-            <div>
-                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px;">Corresponding Author</p>
-                <p style="font-size: 1.1rem; font-weight: 600; color: var(--primary-color);">
-                    <?php echo sanitize($journal['author_name']); ?>
-                </p>
-                <p style="font-size: 0.85rem; color: var(--text-muted);"><?php echo sanitize($journal['author_email']); ?></p>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <?php if (!empty($journal['author_photo'])): ?>
+                    <img src="<?php echo $path_prefix . htmlspecialchars($journal['author_photo']); ?>" alt="Author Photo" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent-color); box-shadow: var(--shadow-sm);">
+                <?php endif; ?>
+                <div>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px;">Corresponding Author</p>
+                    <p style="font-size: 1.1rem; font-weight: 600; color: var(--primary-color);">
+                        <?php echo sanitize($journal['author_name']); ?>
+                    </p>
+                    <p style="font-size: 0.85rem; color: var(--text-muted);"><?php echo sanitize($journal['author_email']); ?></p>
+                </div>
             </div>
             
             <div style="text-align: right;">

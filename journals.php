@@ -382,7 +382,11 @@ function paginate_url($page, $domain, $q) {
 
                         <div class="arc-meta">
                             <span>
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                <?php if (!empty($journal['author_photo'])): ?>
+                                    <img src="<?php echo $path_prefix . htmlspecialchars($journal['author_photo']); ?>" alt="Author" style="width: 16px; height: 16px; border-radius: 50%; object-fit: cover; border: 1px solid #cbd5e1; flex-shrink: 0;">
+                                <?php else: ?>
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                <?php endif; ?>
                                 <?php echo sanitize($journal['author_name']); ?>
                             </span>
                             <span>
