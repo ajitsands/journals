@@ -73,8 +73,8 @@ if (!is_dir(REPO_DIR)) {
 
 chdir(REPO_DIR);
 
-// Execute git pull with stderr redirected to stdout
-$output = shell_exec("git pull origin " . escapeshellarg(DEPLOY_BRANCH) . " 2>&1");
+// Execute git pull with force reset to discard server-side overrides
+$output = shell_exec("git reset --hard 2>&1 && git pull origin " . escapeshellarg(DEPLOY_BRANCH) . " 2>&1");
 
 // 6. Log output and respond
 $log_msg = "Git Pull Output:\n" . trim($output);
