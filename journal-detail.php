@@ -84,13 +84,13 @@ require_once __DIR__ . '/includes/header.php';
                     </button>
                     <!-- Dropdown Menu -->
                     <div id="dlDropMenu" style="display:none; position: absolute; right: 0; top: calc(100% + 6px); background: white; border: 1px solid var(--border-color); border-radius: 10px; box-shadow: var(--shadow-lg); min-width: 240px; z-index: 999; overflow: hidden;">
-                        <a href="/download.php?id=<?php echo $journal['id']; ?>&type=certificate"
+                        <a href="/download.php?id=<?php echo $journal['id']; ?>&type=acceptance"
                            style="display: flex; align-items: center; gap: 12px; padding: 14px 18px; text-decoration: none; color: var(--text-color); font-size: 0.88rem; font-weight: 500; border-bottom: 1px solid var(--border-color); transition: background 0.15s;"
                            onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
-                            <span style="width:36px; height:36px; background: #fffbeb; border-radius: 8px; display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0;">📜</span>
+                            <span style="width:36px; height:36px; background: #fffbeb; border-radius: 8px; display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0;">📨</span>
                             <div>
-                                <div style="font-weight: 600; color: var(--primary-color);">Certificate / Cover Page</div>
-                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Official RJPES publication certificate</div>
+                                <div style="font-weight: 600; color: var(--primary-color);">Acceptance Letter</div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Official RJPES acceptance letter</div>
                             </div>
                         </a>
                         <a href="/download.php?id=<?php echo $journal['id']; ?>&type=article"
