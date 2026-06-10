@@ -739,6 +739,7 @@ select.form-control {
     display: flex;
     gap: 15px;
     flex-wrap: wrap;
+    align-items: flex-end;
 }
 
 .search-form .form-group {
