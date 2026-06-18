@@ -112,28 +112,56 @@ function rjpes_convert_docx_to_pdf($docx_path, $pdf_path) {
         }
     }
     
-    // Write temporary PS1 script to avoid quoting issues
-    $ps1_content = "\$word = New-Object -ComObject Word.Application\n";
-    $ps1_content .= "\$word.Visible = \$false\n";
-    $ps1_content .= "try {\n";
-    $ps1_content .= "    \$doc = \$word.Documents.Open(\"" . addslashes($docx_abs) . "\")\n";
-    $ps1_content .= "    \$doc.SaveAs(\"" . addslashes($pdf_abs) . "\", 17)\n";
-    $ps1_content .= "    \$doc.Close()\n";
-    $ps1_content .= "} catch {\n";
-    $ps1_content .= "    Write-Error \$_.Exception.Message\n";
-    $ps1_content .= "} finally {\n";
-    $ps1_content .= "    \$word.Quit()\n";
-    $ps1_content .= "}\n";
-    
-    $ps1_path = tempnam(sys_get_temp_dir(), 'rjpes_') . '.ps1';
-    file_put_contents($ps1_path, $ps1_content);
-    
-    $cmd = "powershell -ExecutionPolicy Bypass -File " . escapeshellarg($ps1_path) . " 2>&1";
-    $output = shell_exec($cmd);
-    @unlink($ps1_path);
-    
-    if (!empty($output)) {
-        error_log("PowerShell Word conversion output: " . trim($output));
+    if (DIRECTORY_SEPARATOR === '\\') {
+        // Windows Environment: Write temporary PS1 script to use MS Word COM Automation
+        $ps1_content = "\$word = New-Object -ComObject Word.Application\n";
+        $ps1_content .= "\$word.Visible = \$false\n";
+        $ps1_content .= "try {\n";
+        $ps1_content .= "    \$doc = \$word.Documents.Open(\"" . addslashes($docx_abs) . "\")\n";
+        $ps1_content .= "    \$doc.SaveAs(\"" . addslashes($pdf_abs) . "\", 17)\n";
+        $ps1_content .= "    \$doc.Close()\n";
+        $ps1_content .= "} catch {\n";
+        $ps1_content .= "    Write-Error \$_.Exception.Message\n";
+        $ps1_content .= "} finally {\n";
+        $ps1_content .= "    \$word.Quit()\n";
+        $ps1_content .= "}\n";
+        
+        $ps1_path = tempnam(sys_get_temp_dir(), 'rjpes_') . '.ps1';
+        file_put_contents($ps1_path, $ps1_content);
+        
+        $cmd = "powershell -ExecutionPolicy Bypass -File " . escapeshellarg($ps1_path) . " 2>&1";
+        $output = shell_exec($cmd);
+        @unlink($ps1_path);
+        
+        if (!empty($output)) {
+            error_log("PowerShell Word conversion output: " . trim($output));
+        }
+    } else {
+        // Linux / CloudLinux Environment: Use headless LibreOffice/soffice to convert
+        $out_dir = dirname($pdf_abs);
+        
+        // Execute conversion using libreoffice (or soffice as fallback)
+        $cmd = "libreoffice --headless --convert-to pdf --outdir " . escapeshellarg($out_dir) . " " . escapeshellarg($docx_abs) . " 2>&1";
+        $output = shell_exec($cmd);
+        
+        // The generated filename matches the input filename but with .pdf extension
+        $in_filename = pathinfo($docx_abs, PATHINFO_FILENAME);
+        $generated_pdf = $out_dir . DIRECTORY_SEPARATOR . $in_filename . '.pdf';
+        
+        if (!file_exists($generated_pdf)) {
+            // Try soffice fallback
+            $cmd = "soffice --headless --convert-to pdf --outdir " . escapeshellarg($out_dir) . " " . escapeshellarg($docx_abs) . " 2>&1";
+            $output = shell_exec($cmd);
+        }
+        
+        if (file_exists($generated_pdf)) {
+            // Rename to the requested pdf_path if it's different from the default output name
+            if (realpath($generated_pdf) !== realpath($pdf_abs)) {
+                @rename($generated_pdf, $pdf_abs);
+            }
+        } else {
+            error_log("Linux PDF conversion failed. Command: $cmd, Output: " . trim($output));
+        }
     }
     
     return file_exists($pdf_abs) && filesize($pdf_abs) > 0;
