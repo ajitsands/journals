@@ -1,67 +1,47 @@
 <?php
 /**
- * RJPES All-in-One: Git Pull + Fix All PDFs
+ * RJPES All-in-One: Git Pull + Flatten All Manuscript PDFs as JPEG Images.
+ * Since original DOCX files are deleted after upload, we re-render existing
+ * PDF body pages as standard JPEG images that every browser can display.
+ *
  * Visit: https://rjpes.in/fix_all.php
  * DELETE after use.
  */
 header('Content-Type: text/plain; charset=utf-8');
-set_time_limit(300); // 5 minutes max
+set_time_limit(600);
 
-$root    = __DIR__;
-$uploads = $root . '/uploads';
-$py_exe  = 'python3';
+$root = __DIR__;
 
-echo "RJPES: Git Pull + Reprocess All PDFs\n";
-echo "======================================\n\n";
+echo "RJPES: Git Pull + Flatten All Manuscripts\n";
+echo "===========================================\n\n";
 
-// STEP 1: Git pull latest code
+// STEP 1: Git pull
 echo "STEP 1: Git Pull\n";
 echo "----------------\n";
 chdir($root);
-$pull = shell_exec('git reset --hard 2>&1 && git pull origin main 2>&1');
-echo trim($pull) . "\n\n";
+echo shell_exec('git reset --hard 2>&1') . "\n";
+echo shell_exec('git pull origin main 2>&1') . "\n\n";
 
 // STEP 2: Check fitz
 echo "STEP 2: Check PyMuPDF\n";
 echo "---------------------\n";
-$check = shell_exec("$py_exe -c \"import fitz; print('OK: fitz ' + fitz.__version__)\" 2>&1");
-echo trim($check) . "\n\n";
-if (strpos($check, 'OK:') === false) {
-    echo "ERROR: PyMuPDF not available. Cannot fix PDFs.\n";
-    exit(1);
-}
+$py_exe = 'python3';
+$check = shell_exec("$py_exe -c \"import fitz; print(fitz.__version__)\" 2>&1");
+echo "fitz version: " . trim($check) . "\n\n";
 
-// STEP 3: Reprocess ALL manuscripts - flatten all body pages as standard JPEG
-echo "STEP 3: Reprocessing All Manuscripts\n";
-echo "-------------------------------------\n";
+// STEP 3: Flatten ALL pages (including cover) as standard JPEG images
+echo "STEP 3: Flatten All Manuscript PDFs\n";
+echo "------------------------------------\n";
 
 $py_script = <<<'PYEOF'
 import sys, os, fitz
-
-sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-
-def flatten_pdf(in_path, out_path):
-    """Re-render ALL body pages as 150 DPI grayscale JPEG.
-    Fixes JPEG2000 (LibreOffice), CID fonts (MS Word), and DroidSansFallback issues."""
-    src = fitz.open(in_path)
-    out = fitz.open()
-    out.insert_pdf(src, from_page=0, to_page=0)   # cover: keep as-is
-    for i in range(1, len(src)):
-        page  = src[i]
-        mat   = fitz.Matrix(150 / 72, 150 / 72)
-        pix   = page.get_pixmap(matrix=mat, colorspace=fitz.csGRAY, alpha=False)
-        jpg   = pix.tobytes('jpeg', jpg_quality=85)
-        np    = out.new_page(width=page.rect.width, height=page.rect.height)
-        np.insert_image(np.rect, stream=jpg)
-    src.close()
-    out.save(out_path, garbage=4, deflate=True, clean=True)
-    out.close()
 
 uploads_dir = sys.argv[1]
 pdfs = sorted([f for f in os.listdir(uploads_dir)
                if f.startswith('manuscript_') and f.endswith('.pdf')])
 
-print(f"Found {len(pdfs)} PDFs\n")
+print(f"Found {len(pdfs)} manuscripts\n")
+
 ok = 0
 err = 0
 for fname in pdfs:
@@ -69,7 +49,24 @@ for fname in pdfs:
     tmp  = path + '.tmp.pdf'
     try:
         before = os.path.getsize(path) // 1024
-        flatten_pdf(path, tmp)
+        src = fitz.open(path)
+        out = fitz.open()
+        
+        for i in range(len(src)):
+            page = src[i]
+            w = page.rect.width
+            h = page.rect.height
+            # Render EVERY page as 200 DPI RGB JPEG
+            mat = fitz.Matrix(200 / 72, 200 / 72)
+            pix = page.get_pixmap(matrix=mat, alpha=False)
+            jpg = pix.tobytes('jpeg', jpg_quality=90)
+            np = out.new_page(width=w, height=h)
+            np.insert_image(np.rect, stream=jpg)
+        
+        src.close()
+        out.save(tmp, garbage=4, deflate=True, clean=True)
+        out.close()
+        
         os.replace(tmp, path)
         after = os.path.getsize(path) // 1024
         print(f"OK  {fname}  ({before}KB -> {after}KB)")
@@ -77,15 +74,17 @@ for fname in pdfs:
     except Exception as e:
         print(f"ERR {fname}: {e}")
         err += 1
-        if os.path.exists(tmp): os.remove(tmp)
+        if os.path.exists(tmp):
+            os.remove(tmp)
 
 print(f"\nResult: {ok} fixed, {err} errors")
 PYEOF;
 
-$py_path = sys_get_temp_dir() . '/rjpes_fixall_' . time() . '.py';
+$py_path = sys_get_temp_dir() . '/rjpes_flatten_' . time() . '.py';
 file_put_contents($py_path, $py_script);
+$uploads = $root . '/uploads';
 
-$cmd  = "$py_exe " . escapeshellarg($py_path) . " " . escapeshellarg($uploads) . " 2>&1";
+$cmd = "$py_exe " . escapeshellarg($py_path) . " " . escapeshellarg($uploads) . " 2>&1";
 $proc = popen($cmd, 'r');
 if ($proc) {
     while (!feof($proc)) {
@@ -100,6 +99,8 @@ if ($proc) {
 }
 @unlink($py_path);
 
-echo "\n======================================\n";
-echo "DONE. Please DELETE fix_all.php now!\n";
+echo "\n===========================================\n";
+echo "DONE. New submissions will use standard fonts.\n";
+echo "Existing PDFs flattened as JPEG images.\n";
+echo "DELETE fix_all.php from server now!\n";
 ?>
