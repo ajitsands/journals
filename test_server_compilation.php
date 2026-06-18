@@ -13,6 +13,7 @@ set_time_limit(300);
 echo "RJPES PDF Compilation Test\n";
 echo "============================\n\n";
 
+require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/word_helper.php';
 require_once __DIR__ . '/includes/pdf_helper.php';
 
@@ -29,6 +30,7 @@ echo "Step 1: Generating dummy cover...\n";
 $dummy_data = [
     'journal_number' => 'RJPES-2026-TEST',
     'title' => 'Test Manuscript Title for Font Verification',
+    'author_name' => 'John Doe',
     'abstract' => 'This is a test abstract to verify that the PDF generation is working correctly on the server with the installed fonts.',
     'subject_domain' => 'Computer Science / Engineering',
     'volume' => '20',
