@@ -244,13 +244,14 @@ function rjpes_pdf_merge($cover_pdf_path, $body_pdf_path, $output_pdf_path, $jou
     $py_path = tempnam(sys_get_temp_dir(), 'rjpes_') . '.py';
     file_put_contents($py_path, $py_content);
     
-    $cmd = "python " . escapeshellarg($py_path);
+    $py_exe = (DIRECTORY_SEPARATOR === '\\') ? 'python' : 'python3';
+    $cmd = "$py_exe " . escapeshellarg($py_path) . " 2>&1";
     $output = shell_exec($cmd);
     @unlink($py_path);
     @unlink($temp_merged_path);
     
     if (trim($output) !== 'success') {
-        error_log("PDF merge failed: " . $output);
+        error_log("PDF merge failed: " . trim($output));
         return false;
     }
     
@@ -307,9 +308,14 @@ function rjpes_pdf_extract_body($merged_pdf_path, $output_body_path) {
     $py_path = tempnam(sys_get_temp_dir(), 'rjpes_') . '.py';
     file_put_contents($py_path, $py_content);
     
-    $cmd = "python " . escapeshellarg($py_path);
-    shell_exec($cmd);
+    $py_exe = (DIRECTORY_SEPARATOR === '\\') ? 'python' : 'python3';
+    $cmd = "$py_exe " . escapeshellarg($py_path) . " 2>&1";
+    $output = shell_exec($cmd);
     @unlink($py_path);
+    
+    if (trim($output) !== 'success') {
+        error_log("PDF extract body failed: " . trim($output));
+    }
     
     return file_exists($out_abs) && filesize($out_abs) > 0;
 }
