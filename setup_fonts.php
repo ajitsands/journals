@@ -10,12 +10,24 @@
 header('Content-Type: text/plain; charset=utf-8');
 set_time_limit(300);
 
-echo "RJPES Server Font Installer\n";
-echo "============================\n\n";
+echo "RJPES Server Font Installer (v2)\n";
+echo "=================================\n\n";
 
 $home_dir = '/home/rjpes';
 $fonts_dir = $home_dir . '/.fonts';
+$cache_dir = $home_dir . '/.cache';
+$fc_cache_dir = $cache_dir . '/fontconfig';
 $source_dir = __DIR__ . '/assets/fonts';
+
+// Set environment variables for Fontconfig
+putenv("HOME=$home_dir");
+putenv("XDG_CACHE_HOME=$cache_dir");
+$_ENV['HOME'] = $home_dir;
+$_ENV['XDG_CACHE_HOME'] = $cache_dir;
+
+echo "Environment:\n";
+echo "  HOME: " . getenv('HOME') . "\n";
+echo "  XDG_CACHE_HOME: " . getenv('XDG_CACHE_HOME') . "\n\n";
 
 // 1. Check if source folder exists
 if (!file_exists($source_dir)) {
@@ -36,7 +48,19 @@ if (!file_exists($fonts_dir)) {
     echo "Fonts directory already exists: $fonts_dir\n";
 }
 
-// 3. Copy fonts
+// 3. Create ~/.cache/fontconfig if not exists
+if (!file_exists($fc_cache_dir)) {
+    if (mkdir($fc_cache_dir, 0755, true)) {
+        echo "Created cache directory: $fc_cache_dir\n";
+    } else {
+        echo "ERROR: Failed to create cache directory: $fc_cache_dir\n";
+        exit(1);
+    }
+} else {
+    echo "Cache directory already exists: $fc_cache_dir\n";
+}
+
+// 4. Copy fonts
 echo "\nCopying fonts...\n";
 $copied = 0;
 $skipped = 0;
@@ -54,14 +78,16 @@ foreach ($files as $file) {
 }
 echo "\nTotal copied: $copied files (skipped: $skipped)\n";
 
-// 4. Run fc-cache
+// 5. Run fc-cache with env vars
 echo "\nRebuilding font cache (fc-cache)...\n";
-$output = shell_exec("fc-cache -f -v " . escapeshellarg($fonts_dir) . " 2>&1");
+$cmd = "export HOME=" . escapeshellarg($home_dir) . " && export XDG_CACHE_HOME=" . escapeshellarg($cache_dir) . " && fc-cache -f -v " . escapeshellarg($fonts_dir) . " 2>&1";
+$output = shell_exec($cmd);
 echo $output . "\n";
 
-// 5. Verify installed fonts
+// 6. Verify installed fonts
 echo "\nVerifying installed fonts (fc-list)...\n";
-$font_list = shell_exec('fc-list : family | sort -u | head -n 100 2>&1');
+$cmd_list = "export HOME=" . escapeshellarg($home_dir) . " && export XDG_CACHE_HOME=" . escapeshellarg($cache_dir) . " && fc-list : family | sort -u | head -n 100 2>&1";
+$font_list = shell_exec($cmd_list);
 echo $font_list . "\n";
 
 echo "=====================================\n";
