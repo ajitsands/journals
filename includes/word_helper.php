@@ -168,7 +168,8 @@ function rjpes_convert_docx_to_pdf($docx_path, $pdf_path) {
 }
 
 /**
- * Merge cover PDF and body PDF using a temporary Python script and pypdf.
+ * Merge cover PDF and body PDF using PyMuPDF (fitz) only.
+ * Using fitz's insert_pdf() instead of pypdf preserves all embedded fonts intact.
  * @param string $cover_pdf_path
  * @param string $body_pdf_path
  * @param string $output_pdf_path
@@ -198,22 +199,17 @@ function rjpes_pdf_merge($cover_pdf_path, $body_pdf_path, $output_pdf_path, $jou
         }
     }
     
-    // Create a unique temporary path for the initial merged file to avoid file lock issues in PyMuPDF
-    $temp_merged_path = tempnam(sys_get_temp_dir(), 'rjpes_merge_') . '.pdf';
-    
     $py_content = "import sys\n";
-    $py_content .= "import fitz\n"; // PyMuPDF
-    $py_content .= "from pypdf import PdfWriter\n";
+    $py_content .= "import fitz\n"; // PyMuPDF only — preserves embedded fonts
     $py_content .= "try:\n";
-    $py_content .= "    # 1. Merge PDFs using pypdf to a temp path\n";
-    $py_content .= "    merger = PdfWriter()\n";
-    $py_content .= "    merger.append(\"" . addslashes($cover_abs) . "\")\n";
-    $py_content .= "    merger.append(\"" . addslashes($body_abs) . "\")\n";
-    $py_content .= "    merger.write(\"" . addslashes($temp_merged_path) . "\")\n";
-    $py_content .= "    merger.close()\n";
+    $py_content .= "    # 1. Open cover PDF and insert body PDF pages using fitz\n";
+    $py_content .= "    #    This preserves all embedded TrueType/OpenType fonts intact\n";
+    $py_content .= "    doc = fitz.open(\"" . addslashes($cover_abs) . "\")\n";
+    $py_content .= "    body = fitz.open(\"" . addslashes($body_abs) . "\")\n";
+    $py_content .= "    doc.insert_pdf(body)\n";
+    $py_content .= "    body.close()\n";
     $py_content .= "    \n";
-    $py_content .= "    # 2. Add header, line, footer, and page numbers to body pages, saving to the final destination\n";
-    $py_content .= "    doc = fitz.open(\"" . addslashes($temp_merged_path) . "\")\n";
+    $py_content .= "    # 2. Add header, line, footer, and page numbers to body pages\n";
     $py_content .= "    total_pages = len(doc)\n";
     $py_content .= "    for i in range(1, total_pages):\n";
     $py_content .= "        page = doc[i]\n";
@@ -248,7 +244,6 @@ function rjpes_pdf_merge($cover_pdf_path, $body_pdf_path, $output_pdf_path, $jou
     $cmd = "$py_exe " . escapeshellarg($py_path) . " 2>&1";
     $output = shell_exec($cmd);
     @unlink($py_path);
-    @unlink($temp_merged_path);
     
     if (trim($output) !== 'success') {
         error_log("PDF merge failed: " . trim($output));
@@ -259,7 +254,8 @@ function rjpes_pdf_merge($cover_pdf_path, $body_pdf_path, $output_pdf_path, $jou
 }
 
 /**
- * Extract all pages except page 1 from a PDF file using pypdf.
+ * Extract all pages except page 1 from a PDF file using PyMuPDF (fitz).
+ * Using fitz's insert_pdf() instead of pypdf preserves all embedded fonts intact.
  * @param string $merged_pdf_path
  * @param string $output_body_path
  * @return bool
@@ -288,19 +284,19 @@ function rjpes_pdf_extract_body($merged_pdf_path, $output_body_path) {
     }
     
     $py_content = "import sys\n";
-    $py_content .= "from pypdf import PdfReader, PdfWriter\n";
+    $py_content .= "import fitz\n"; // PyMuPDF only — preserves embedded fonts
     $py_content .= "try:\n";
-    $py_content .= "    reader = PdfReader(\"" . addslashes($merged_abs) . "\")\n";
-    $py_content .= "    writer = PdfWriter()\n";
-    $py_content .= "    # Extract from page index 1 to end (pages 2+)\n";
-    $py_content .= "    if len(reader.pages) > 1:\n";
-    $py_content .= "        for i in range(1, len(reader.pages)):\n";
-    $py_content .= "            writer.add_page(reader.pages[i])\n";
+    $py_content .= "    doc = fitz.open(\"" . addslashes($merged_abs) . "\")\n";
+    $py_content .= "    out_doc = fitz.open()\n";
+    $py_content .= "    # Extract from page index 1 to end (pages 2+), skipping the cover\n";
+    $py_content .= "    if len(doc) > 1:\n";
+    $py_content .= "        out_doc.insert_pdf(doc, from_page=1, to_page=len(doc)-1)\n";
     $py_content .= "    else:\n";
-    $py_content .= "        # Fallback to copy the single page if no other pages\n";
-    $py_content .= "        writer.add_page(reader.pages[0])\n";
-    $py_content .= "    with open(\"" . addslashes($out_abs) . "\", 'wb') as f:\n";
-    $py_content .= "        writer.write(f)\n";
+    $py_content .= "        # Fallback: copy the single page if no body pages exist\n";
+    $py_content .= "        out_doc.insert_pdf(doc, from_page=0, to_page=0)\n";
+    $py_content .= "    out_doc.save(\"" . addslashes($out_abs) . "\")\n";
+    $py_content .= "    out_doc.close()\n";
+    $py_content .= "    doc.close()\n";
     $py_content .= "    print('success')\n";
     $py_content .= "except Exception as e:\n";
     $py_content .= "    print('error:', str(e))\n";
