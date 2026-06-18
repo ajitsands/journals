@@ -5,6 +5,91 @@ require_role('author');
 $user = get_logged_in_user();
 $author_id = $user['id'];
 
+// Handle submission deletion
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_journal') {
+    $journal_id = intval($_POST['journal_id'] ?? 0);
+    
+    try {
+        // Retrieve the journal and make sure it belongs to the logged-in author
+        $stmt = $pdo->prepare("SELECT * FROM journals WHERE id = ? AND author_id = ?");
+        $stmt->execute([$journal_id, $author_id]);
+        $journal = $stmt->fetch();
+        
+        if ($journal) {
+            $allowed_statuses = ['submitted_waiting_review', 'under_review', 'revisions_required'];
+            if (in_array($journal['status'], $allowed_statuses)) {
+                // Gather all files to delete from disk to prevent orphaned files
+                $files_to_delete = [];
+                
+                // 1. Primary manuscript file (merged PDF)
+                if (!empty($journal['manuscript_file'])) {
+                    $files_to_delete[] = __DIR__ . '/../' . $journal['manuscript_file'];
+                }
+                
+                // 2. Primary author photo
+                if (!empty($journal['author_photo'])) {
+                    $files_to_delete[] = __DIR__ . '/../' . $journal['author_photo'];
+                }
+                
+                // 3. Co-author photos
+                $ca_stmt = $pdo->prepare("SELECT photo_path FROM journal_authors WHERE journal_id = ?");
+                $ca_stmt->execute([$journal_id]);
+                while ($photo_path = $ca_stmt->fetchColumn()) {
+                    if (!empty($photo_path)) {
+                        $files_to_delete[] = __DIR__ . '/../' . $photo_path;
+                    }
+                }
+                
+                // 4. Past version manuscript files
+                $v_stmt = $pdo->prepare("SELECT manuscript_file FROM journal_versions WHERE journal_id = ?");
+                $v_stmt->execute([$journal_id]);
+                while ($v_file = $v_stmt->fetchColumn()) {
+                    if (!empty($v_file)) {
+                        $files_to_delete[] = __DIR__ . '/../' . $v_file;
+                    }
+                }
+                
+                // 5. Payment proofs (safety fallback)
+                $p_stmt = $pdo->prepare("SELECT payment_proof FROM payments WHERE journal_id = ?");
+                $p_stmt->execute([$journal_id]);
+                while ($p_file = $p_stmt->fetchColumn()) {
+                    if (!empty($p_file)) {
+                        $files_to_delete[] = __DIR__ . '/../' . $p_file;
+                    }
+                }
+                
+                // Perform DB deletion in a transaction
+                $pdo->beginTransaction();
+                
+                $del_stmt = $pdo->prepare("DELETE FROM journals WHERE id = ?");
+                $del_stmt->execute([$journal_id]);
+                
+                $pdo->commit();
+                
+                // Unlink all files from disk
+                foreach ($files_to_delete as $filepath) {
+                    $real_path = realpath($filepath);
+                    if ($real_path && file_exists($real_path) && is_file($real_path)) {
+                        @unlink($real_path);
+                    }
+                }
+                
+                header("Location: dashboard.php?success=deleted");
+                exit;
+            } else {
+                $error_message = "This journal cannot be deleted because it has already been accepted, published, or rejected.";
+            }
+        } else {
+            $error_message = "Journal not found or you do not have permission to delete it.";
+        }
+    } catch (PDOException $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        $error_message = "Database error during deletion: " . $e->getMessage();
+    }
+}
+
 // Get all submissions of this author with current version number
 try {
     $stmt = $pdo->prepare("SELECT j.*, 
@@ -57,6 +142,20 @@ require_once __DIR__ . '/../includes/header.php';
             <div class="alert alert-success">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
                 <div>Your revised manuscript has been submitted successfully.</div>
+            </div>
+        <?php endif; ?>
+
+        <?php if (isset($_GET['success']) && $_GET['success'] == 'deleted'): ?>
+            <div class="alert alert-success">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <div>Your manuscript has been successfully deleted along with all its co-authors and history.</div>
+            </div>
+        <?php endif; ?>
+
+        <?php if (isset($error_message)): ?>
+            <div class="alert alert-danger">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <div><?php echo htmlspecialchars($error_message); ?></div>
             </div>
         <?php endif; ?>
 
@@ -155,6 +254,16 @@ require_once __DIR__ . '/../includes/header.php';
 
                                         <!-- Document History Button & Acceptance Letter -->
                                         <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px;">
+                                            <?php if (in_array($paper['status'], ['submitted_waiting_review', 'under_review', 'revisions_required'])): ?>
+                                                <form id="delete-form-<?php echo $paper['id']; ?>" method="POST" action="" style="display: inline; margin: 0; padding: 0;">
+                                                    <input type="hidden" name="action" value="delete_journal">
+                                                    <input type="hidden" name="journal_id" value="<?php echo $paper['id']; ?>">
+                                                    <button type="button" onclick="confirmDelete(<?php echo $paper['id']; ?>, '<?php echo addslashes(sanitize($paper['journal_number'])); ?>')" style="background: #fee2e2; border: 1px solid #fca5a5; color: #dc2626; font-size: 0.75rem; cursor: pointer; padding: 4px 10px; border-radius: 5px; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; width: fit-content; transition: all 0.2s;" onmouseover="this.style.background='#fecaca'" onmouseout="this.style.background='#fee2e2'">
+                                                        🗑️ Delete Submission
+                                                    </button>
+                                                </form>
+                                            <?php endif; ?>
+
                                             <button onclick="openTimeline(<?php echo $paper['id']; ?>, '<?php echo addslashes(sanitize($paper['journal_number'])); ?>')" style="background: none; border: 1px solid #94a3b8; color: #475569; font-size: 0.75rem; cursor: pointer; padding: 4px 10px; border-radius: 5px; display: inline-flex; align-items: center; gap: 4px; font-weight: 500; width: fit-content;">
                                                 📄 Document History
                                             </button>
@@ -303,7 +412,32 @@ require_once __DIR__ . '/../includes/header.php';
 </div>
 <?php endforeach; ?>
 
+<!-- SweetAlert2 library -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <script>
+function confirmDelete(id, journalNo) {
+    Swal.fire({
+        title: 'Delete Submission?',
+        html: 'Are you sure you want to delete manuscript <strong>' + journalNo + '</strong>?<br><br>This will permanently delete the manuscript file, co-author details, and all review history.<br><span style="color: #dc2626; font-weight: 600;">This action cannot be undone!</span>',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#475569',
+        confirmButtonText: 'Yes, delete it!',
+        cancelButtonText: 'Cancel',
+        focusCancel: true
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Find and submit the specific delete form
+            var form = document.getElementById('delete-form-' + id);
+            if (form) {
+                form.submit();
+            }
+        }
+    });
+}
+
 function toggleReviews(id) {
     var element = document.getElementById('reviews-' + id);
     if (element.style.display === 'none') {

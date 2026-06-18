@@ -22,6 +22,20 @@ try {
         exit;
     }
     
+    // Fetch all authors from journal_authors table
+    $authors_stmt = $pdo->prepare("SELECT * FROM journal_authors WHERE journal_id = ? ORDER BY order_num ASC");
+    $authors_stmt->execute([$id]);
+    $all_authors = $authors_stmt->fetchAll();
+    
+    // Fallback if empty (for backwards compatibility)
+    if (empty($all_authors)) {
+        $all_authors = [[
+            'name' => $journal['author_name'],
+            'photo_path' => $journal['author_photo'] ?? null,
+            'order_num' => 1
+        ]];
+    }
+    
     $is_authorized_viewer = false;
     if ($journal['status'] === 'published') {
         $is_authorized_viewer = true;
@@ -148,17 +162,24 @@ require_once __DIR__ . '/includes/header.php';
         </h1>
 
         <div style="border-top: 1px solid var(--border-color); padding-top: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <?php if (!empty($journal['author_photo'])): ?>
-                    <img src="<?php echo $path_prefix . htmlspecialchars($journal['author_photo']); ?>" alt="Author Photo" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent-color); box-shadow: var(--shadow-sm);">
-                <?php endif; ?>
-                <div>
-                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px;">Corresponding Author</p>
-                    <p style="font-size: 1.1rem; font-weight: 600; color: var(--primary-color);">
-                        <?php echo sanitize($journal['author_name']); ?>
-                    </p>
-                    <p style="font-size: 0.85rem; color: var(--text-muted);"><?php echo sanitize($journal['author_email']); ?></p>
-                </div>
+            <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+                <?php foreach ($all_authors as $index => $auth): ?>
+                    <div style="display: flex; align-items: center; gap: 12px; background: #f8fafc; padding: 10px 16px; border-radius: 10px; border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);">
+                        <?php if (!empty($auth['photo_path']) && file_exists(__DIR__ . '/' . $auth['photo_path'])): ?>
+                            <img src="<?php echo $path_prefix . htmlspecialchars($auth['photo_path']); ?>" alt="<?php echo htmlspecialchars($auth['name']); ?>" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent-color);">
+                        <?php else: ?>
+                            <div style="width: 44px; height: 44px; border-radius: 50%; background: #e2e8f0; display: flex; align-items: center; justify-content: center; color: #64748b; font-weight: bold; border: 2px solid #cbd5e1; font-size: 1.1rem;">
+                                <?php echo strtoupper(substr($auth['name'], 0, 1)); ?>
+                            </div>
+                        <?php endif; ?>
+                        <div>
+                            <p style="font-size: 0.95rem; font-weight: 600; color: var(--primary-color); margin: 0;"><?php echo htmlspecialchars($auth['name']); ?></p>
+                            <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0; font-weight: 500;">
+                                <?php echo $index === 0 ? 'Corresponding Author' : 'Co-Author'; ?>
+                            </p>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
             </div>
             
             <div style="text-align: right;">

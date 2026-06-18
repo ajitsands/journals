@@ -213,16 +213,47 @@ class RJPES_PDF {
         $date = date('d F Y', $pub_at);
         $month_year = date('F Y', $pub_at);
         
-        $photo_to_embed = null;
-        if (!empty($journal['author_photo'])) {
-            $photo_abs_path = __DIR__ . '/../' . ltrim(str_replace(['/', '\\'], '/', $journal['author_photo']), '/');
-            if (file_exists($photo_abs_path)) {
-                $photo_info_size = @getimagesize($photo_abs_path);
-                if ($photo_info_size && $photo_info_size[2] === IMAGETYPE_JPEG) {
-                    $photo_to_embed = $photo_abs_path;
+        // Fetch full authors list
+        $authors_list = [];
+        if (isset($journal['authors'])) {
+            $authors_list = $journal['authors'];
+        } elseif (isset($journal['id']) && $journal['id'] > 0) {
+            global $pdo;
+            try {
+                $auth_stmt = $pdo->prepare("SELECT * FROM journal_authors WHERE journal_id = ? ORDER BY order_num ASC");
+                $auth_stmt->execute([$journal['id']]);
+                $authors_list = $auth_stmt->fetchAll();
+            } catch (Exception $e) {}
+        }
+        if (empty($authors_list)) {
+            $authors_list = [[
+                'name' => $author,
+                'photo_path' => $journal['author_photo'] ?? null,
+                'order_num' => 1
+            ]];
+        }
+        
+        $photos_to_embed = [];
+        foreach ($authors_list as $idx => $auth) {
+            if (!empty($auth['photo_path'])) {
+                $photo_abs_path = __DIR__ . '/../' . ltrim(str_replace(['/', '\\'], '/', $auth['photo_path']), '/');
+                if (file_exists($photo_abs_path)) {
+                    $photo_info_size = @getimagesize($photo_abs_path);
+                    if ($photo_info_size && $photo_info_size[2] === IMAGETYPE_JPEG) {
+                        $photos_to_embed[] = [
+                            'path' => $photo_abs_path,
+                            'index' => $idx + 1
+                        ];
+                    }
                 }
             }
         }
+        
+        $names = [];
+        foreach ($authors_list as $auth) {
+            $names[] = $auth['name'];
+        }
+        $authors_str = "Author(s): " . implode(", ", $names);
         
         // Define page contents
         $content_stream = "";
@@ -267,41 +298,114 @@ class RJPES_PDF {
             $current_y -= 22;
         }
         
-        // Authors & Domain
-        $current_y -= 10;
-        $content_stream .= "BT\n";
-        $content_stream .= "/F2 11 Tf\n";
-        $content_stream .= "54 " . $current_y . " Td (" . $this->escape_text("Author: " . $author) . ") Tj\n";
-        $content_stream .= "ET\n";
+        // Draw multiple photos/placeholders in a row on the right, with names centered underneath
+        $p_w = 55;
+        $p_h = 70;
+        $gap = 8;
+        $p_y = $current_y - 85; // bottom of photos
         
-        $current_y -= 15;
+        // Print "Author(s):" label above the photos row
+        $leftmost_x = 541 - count($authors_list) * $p_w - (count($authors_list) - 1) * $gap;
+        $label_y = $p_y + $p_h + 5;
         $content_stream .= "BT\n";
-        $content_stream .= "/F1 10 Tf\n";
-        $content_stream .= "54 " . $current_y . " Td (" . $this->escape_text("Subject Domain: " . $domain . " | Published on: " . $date) . ") Tj\n";
+        $content_stream .= "/F2 8.5 Tf\n"; // Bold
+        $content_stream .= "0.3 g\n"; // Dark Gray text
+        $content_stream .= $leftmost_x . " " . $label_y . " Td (Author(s):) Tj\n";
         $content_stream .= "ET\n";
+        $content_stream .= "0 g\n";
         
-        if ($photo_to_embed) {
-            $p_w = 70;
-            $p_h = 90;
-            $p_x = 541 - $p_w; // 471
-            $p_y = $current_y - 55; // bottom of photo
+        foreach ($authors_list as $i => $auth) {
+            $p_x = 541 - ($i + 1) * $p_w - $i * $gap;
             
-            // Draw photo
-            $content_stream .= "q\n";
-            $content_stream .= sprintf("%.2f 0 0 %.2f %.2f %.2f cm\n", $p_w, $p_h, $p_x, $p_y);
-            $content_stream .= "/AuthorPhoto Do\n";
-            $content_stream .= "Q\n";
+            // Check if this author has an embedded photo
+            $photo_ref = null;
+            foreach ($photos_to_embed as $pe) {
+                if ($pe['index'] == ($i + 1)) {
+                    $photo_ref = "/AuthorPhoto" . ($i + 1);
+                    break;
+                }
+            }
             
-            // Draw border outline around photo
-            $content_stream .= "0.5 w 0.8 G\n"; // 0.8 grey
-            $content_stream .= sprintf("%.2f %.2f %.2f %.2f re S\n", $p_x - 1, $p_y - 1, $p_w + 2, $p_h + 2);
-            $content_stream .= "0 G\n"; // Reset stroke to black
+            if ($photo_ref) {
+                // Draw actual photo
+                $content_stream .= "q\n";
+                $content_stream .= sprintf("%.2f 0 0 %.2f %.2f %.2f cm\n", $p_w, $p_h, $p_x, $p_y);
+                $content_stream .= $photo_ref . " Do\n";
+                $content_stream .= "Q\n";
+                
+                // Draw border outline
+                $content_stream .= "0.5 w 0.8 G\n";
+                $content_stream .= sprintf("%.2f %.2f %.2f %.2f re S\n", $p_x - 1, $p_y - 1, $p_w + 2, $p_h + 2);
+                $content_stream .= "0 G\n";
+            } else {
+                // Draw placeholder box
+                $content_stream .= "0.95 g\n"; // Light grey fill
+                $content_stream .= sprintf("%.2f %.2f %.2f %.2f re f\n", $p_x, $p_y, $p_w, $p_h);
+                
+                // Draw border
+                $content_stream .= "0.5 w 0.8 G\n";
+                $content_stream .= sprintf("%.2f %.2f %.2f %.2f re S\n", $p_x, $p_y, $p_w, $p_h);
+                $content_stream .= "0 G\n";
+                
+                // Draw initials inside box
+                $initials = '';
+                $name_parts = explode(' ', $auth['name']);
+                if (count($name_parts) > 1) {
+                    $initials = strtoupper(substr($name_parts[0], 0, 1) . substr($name_parts[count($name_parts) - 1], 0, 1));
+                } else {
+                    $initials = strtoupper(substr($auth['name'], 0, 2));
+                }
+                
+                $init_width = $this->get_text_width($initials, 14);
+                $init_x = $p_x + ($p_w - $init_width) / 2;
+                $init_y = $p_y + ($p_h / 2) - 5; // vertical center
+                
+                $content_stream .= "BT\n";
+                $content_stream .= "/F2 14 Tf\n"; // Bold
+                $content_stream .= "0.5 g\n"; // Medium grey text
+                $content_stream .= $init_x . " " . $init_y . " Td (" . $this->escape_text($initials) . ") Tj\n";
+                $content_stream .= "ET\n";
+                $content_stream .= "0 g\n"; // Reset to black
+            }
             
-            // Update current_y to be below the photo
-            $current_y = $p_y;
+            // Draw name centered under photo/placeholder
+            $auth_name = $auth['name'];
+            $font_size = 7.5;
+            $name_parts = explode(' ', $auth_name);
+            if (count($name_parts) > 1 && $this->get_text_width($auth_name, $font_size) > $p_w + 10) {
+                // Draw on two lines
+                $line1 = $name_parts[0];
+                $line2 = implode(' ', array_slice($name_parts, 1));
+                
+                $w1 = $this->get_text_width($line1, $font_size);
+                $w2 = $this->get_text_width($line2, $font_size);
+                
+                $x1 = $p_x + ($p_w - $w1) / 2;
+                $x2 = $p_x + ($p_w - $w2) / 2;
+                
+                $content_stream .= "BT\n";
+                $content_stream .= "/F2 " . $font_size . " Tf\n";
+                $content_stream .= $x1 . " " . ($p_y - 10) . " Td (" . $this->escape_text($line1) . ") Tj\n";
+                $content_stream .= "ET\n";
+                
+                $content_stream .= "BT\n";
+                $content_stream .= "/F2 " . $font_size . " Tf\n";
+                $content_stream .= $x2 . " " . ($p_y - 19) . " Td (" . $this->escape_text($line2) . ") Tj\n";
+                $content_stream .= "ET\n";
+            } else {
+                // Draw on single line
+                $w = $this->get_text_width($auth_name, $font_size);
+                $x = $p_x + ($p_w - $w) / 2;
+                
+                $content_stream .= "BT\n";
+                $content_stream .= "/F2 " . $font_size . " Tf\n";
+                $content_stream .= $x . " " . ($p_y - 12) . " Td (" . $this->escape_text($auth_name) . ") Tj\n";
+                $content_stream .= "ET\n";
+            }
         }
         
-        $current_y -= 25;
+        $current_y = $p_y - 25; // Update current_y below names
+        
         $content_stream .= "0.5 w 0 g\n"; // Black stroke, black fill
         $content_stream .= "54 " . ($current_y - 10) . " m 541 " . ($current_y - 10) . " l S\n";
         
@@ -487,10 +591,16 @@ class RJPES_PDF {
             }
         }
         
-        // Try to embed author photo if configured
-        $author_photo_info = null;
-        if (isset($photo_to_embed) && $photo_to_embed) {
-            $author_photo_info = $this->embed_jpeg_image($photo_to_embed);
+        // Try to embed author photos if configured
+        $embedded_photos = [];
+        foreach ($photos_to_embed as $p) {
+            $info = $this->embed_jpeg_image($p['path']);
+            if ($info) {
+                $embedded_photos[] = [
+                    'id' => $info['id'],
+                    'index' => $p['index']
+                ];
+            }
         }
         
         // Font 1 (Regular)
@@ -509,8 +619,8 @@ class RJPES_PDF {
         if ($img_info) {
             $xobjects[] = "/SigImg " . $img_info['id'] . " 0 R";
         }
-        if ($author_photo_info) {
-            $xobjects[] = "/AuthorPhoto " . $author_photo_info['id'] . " 0 R";
+        foreach ($embedded_photos as $ep) {
+            $xobjects[] = "/AuthorPhoto" . $ep['index'] . " " . $ep['id'] . " 0 R";
         }
         
         if (!empty($xobjects)) {

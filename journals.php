@@ -55,7 +55,9 @@ if ($current_page > $total_pages) $current_page = $total_pages;
 $published_journals = [];
 $error_msg = '';
 try {
-    $sql = "SELECT j.*, u.fullname as author_name FROM journals j 
+    $sql = "SELECT j.*, u.fullname as author_name,
+            (SELECT COUNT(*) FROM journal_authors ja WHERE ja.journal_id = j.id AND ja.order_num > 1) as co_author_count
+            FROM journals j 
             JOIN users u ON j.author_id = u.id 
             $where
             ORDER BY j.published_at DESC, j.id DESC
@@ -387,7 +389,13 @@ function paginate_url($page, $domain, $q) {
                                 <?php else: ?>
                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                                 <?php endif; ?>
-                                <?php echo sanitize($journal['author_name']); ?>
+                                <?php 
+                                $disp_name = sanitize($journal['author_name']);
+                                if (($journal['co_author_count'] ?? 0) > 0) {
+                                    $disp_name .= ' et al.';
+                                }
+                                echo $disp_name;
+                                ?>
                             </span>
                             <span>
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>

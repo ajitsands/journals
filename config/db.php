@@ -46,6 +46,23 @@ try {
             $pdo->exec("ALTER TABLE journals ADD COLUMN author_photo VARCHAR(255) DEFAULT NULL");
         } catch (PDOException $ex) {}
     }
+
+    // Auto-migration: Check and create journal_authors table
+    try {
+        $pdo->query("SELECT 1 FROM journal_authors LIMIT 1");
+    } catch (PDOException $e) {
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS journal_authors (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                journal_id INT NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                photo_path VARCHAR(255) DEFAULT NULL,
+                order_num INT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (journal_id) REFERENCES journals(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        } catch (PDOException $ex) {}
+    }
 } catch (PDOException $e) {
     // In production, log error and show friendly message
     die("Database connection failed. Please ensure MySQL is running and the database is imported. Error: " . $e->getMessage());

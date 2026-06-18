@@ -142,11 +142,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($upload_ok) {
         $regenerate_pdf = false;
         
+        // Ensure word_helper.php functions are available
+        require_once __DIR__ . '/../includes/word_helper.php';
+        
         if ($new_file_uploaded) {
             $regenerate_pdf = true;
             // Convert uploaded doc/docx to PDF
-            require_once __DIR__ . '/../includes/word_helper.php';
-            
             $extracted_content = '';
             if ($file_ext === 'docx') {
                 $extracted_content = rjpes_read_docx($dest_path);
@@ -163,11 +164,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     @unlink(__DIR__ . '/../' . $author_photo_path);
                 }
             } else {
-                $content = $extracted_content; // Update content to be the extracted text
-                // Delete the word file from the server
-                @unlink($dest_path);
+                $content = $extracted_content; // Update content to be the extracted text for portal preview
             }
-        } elseif ($is_edit && ($new_photo_uploaded || $_POST['title'] !== $edit_journal['title'] || $_POST['abstract'] !== $edit_journal['abstract'] || $_POST['content'] !== $edit_journal['content'] || $_POST['subject_domain'] !== $edit_journal['subject_domain'])) {
+        } elseif ($is_edit) {
+            // Always regenerate PDF on edit to reflect any metadata/co-author/photo updates
             $regenerate_pdf = true;
         }
         
@@ -184,6 +184,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($row['setting_key'] === 'current_issue') $latest_iss = $row['setting_value'];
                 }
             } catch (PDOException $e) {}
+            
+            // Build temporary authors list to pass to cover PDF generator
+            $temp_authors = [];
+            // Add primary author
+            $temp_authors[] = [
+                'name' => $user['fullname'],
+                'photo_path' => $author_photo_path,
+                'order_num' => 1
+            ];
+            // Add submitted co-authors
+            if (isset($_POST['co_author_name']) && is_array($_POST['co_author_name'])) {
+                foreach ($_POST['co_author_name'] as $idx => $name) {
+                    $name = sanitize($name);
+                    if (empty($name)) continue;
+                    
+                    // We must find their photo_path (either new upload or existing preserved)
+                    $co_id = isset($_POST['co_author_id'][$idx]) ? intval($_POST['co_author_id'][$idx]) : 0;
+                    $co_photo_path = null;
+                    
+                    if ($is_edit && $co_id > 0) {
+                        // Get existing photo path
+                        $ec_stmt = $pdo->prepare("SELECT photo_path FROM journal_authors WHERE id = ?");
+                        $ec_stmt->execute([$co_id]);
+                        $co_photo_path = $ec_stmt->fetchColumn();
+                    }
+                    
+                    $file_input_name = "co_author_photo_" . $idx;
+                    if (isset($_FILES[$file_input_name]) && $_FILES[$file_input_name]['error'] === UPLOAD_ERR_OK) {
+                        $photo_name = $_FILES[$file_input_name]['name'];
+                        $photo_tmp = $_FILES[$file_input_name]['tmp_name'];
+                        $photo_ext = strtolower(pathinfo($photo_name, PATHINFO_EXTENSION));
+                        
+                        $allowed_photo_exts = ['jpg', 'jpeg'];
+                        if (in_array($photo_ext, $allowed_photo_exts)) {
+                            $new_photo_name = 'co_author_photo_' . time() . '_' . rand(1000, 9999) . '.' . $photo_ext;
+                            $photo_dest_path = __DIR__ . '/../uploads/' . $new_photo_name;
+                            if (move_uploaded_file($photo_tmp, $photo_dest_path)) {
+                                if ($is_edit && !empty($co_photo_path)) {
+                                    @unlink(__DIR__ . '/../' . $co_photo_path);
+                                }
+                                $co_photo_path = 'uploads/' . $new_photo_name;
+                            }
+                        }
+                    }
+                    
+                    $temp_authors[] = [
+                        'name' => $name,
+                        'photo_path' => $co_photo_path,
+                        'order_num' => count($temp_authors) + 1
+                    ];
+                }
+            }
     
             // Create the data array for PDF generator
             $journal_pdf_data = [
@@ -192,34 +244,89 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'subject_domain' => $subject_domain,
                 'journal_number' => $journal_number,
                 'abstract' => $abstract,
-                'content' => $content,
+                'content' => '', // MUST BE EMPTY for cover page only
                 'volume' => $latest_vol,
                 'issue' => $latest_iss,
                 'published_at' => date('Y-m-d H:i:s'),
-                'author_photo' => $author_photo_path
+                'author_photo' => $author_photo_path,
+                'authors' => $temp_authors
             ];
     
-            // Generate PDF
+            // 1. Generate Cover Page PDF
             $pdf_generator = new RJPES_PDF();
-            $pdf_bytes = $pdf_generator->generate($journal_pdf_data);
-    
-            // Save PDF to server
-            $pdf_filename = 'manuscript_' . time() . '_' . rand(1000, 9999) . '.pdf';
-            $pdf_dest_path = $upload_dir . $pdf_filename;
-    
-            if (file_put_contents($pdf_dest_path, $pdf_bytes) !== false) {
-                // Delete old PDF file if it exists and we are replacing it
-                if ($is_edit && !empty($edit_journal['manuscript_file'])) {
-                    @unlink(__DIR__ . '/../' . $edit_journal['manuscript_file']);
+            $cover_bytes = $pdf_generator->generate($journal_pdf_data);
+            
+            $cover_pdf_filename = 'cover_temp_' . time() . '_' . rand(1000, 9999) . '.pdf';
+            $cover_pdf_path = $upload_dir . $cover_pdf_filename;
+            file_put_contents($cover_pdf_path, $cover_bytes);
+            
+            $body_pdf_path = '';
+            
+            // 2. Generate Body PDF (convert DOCX to PDF or extract from old merged PDF)
+            if ($new_file_uploaded) {
+                // Convert uploaded word file to PDF
+                $body_pdf_filename = 'body_temp_' . time() . '_' . rand(1000, 9999) . '.pdf';
+                $body_pdf_path = $upload_dir . $body_pdf_filename;
+                $conv_success = rjpes_convert_docx_to_pdf($dest_path, $body_pdf_path);
+                
+                // Delete the uploaded Word file
+                @unlink($dest_path);
+                
+                if (!$conv_success) {
+                    $message = "Failed to convert Word document to PDF using MS Word on server.";
+                    $message_type = "danger";
+                    $upload_ok = false;
+                    @unlink($cover_pdf_path);
+                    if ($new_photo_uploaded && !empty($author_photo_path)) {
+                        @unlink(__DIR__ . '/../' . $author_photo_path);
+                    }
                 }
-                // Update variables to save PDF path instead of word path
-                $file_path = 'uploads/' . $pdf_filename;
-            } else {
-                $message = "Failed to convert document to PDF. Check server permissions.";
-                $message_type = "danger";
-                $upload_ok = false;
-                if ($new_photo_uploaded && !empty($author_photo_path)) {
-                    @unlink(__DIR__ . '/../' . $author_photo_path);
+            } elseif ($is_edit && !empty($edit_journal['manuscript_file'])) {
+                // Extract body PDF pages from the existing merged PDF
+                $existing_pdf_path = __DIR__ . '/../' . $edit_journal['manuscript_file'];
+                if (file_exists($existing_pdf_path)) {
+                    $body_pdf_filename = 'body_temp_' . time() . '_' . rand(1000, 9999) . '.pdf';
+                    $body_pdf_path = $upload_dir . $body_pdf_filename;
+                    $ext_success = rjpes_pdf_extract_body($existing_pdf_path, $body_pdf_path);
+                    
+                    if (!$ext_success) {
+                        // Fallback: copy the existing PDF as body if extraction fails
+                        copy($existing_pdf_path, $body_pdf_path);
+                    }
+                }
+            }
+            
+            // 3. Merge Cover PDF and Body PDF
+            if ($upload_ok) {
+                $final_pdf_filename = 'manuscript_' . time() . '_' . rand(1000, 9999) . '.pdf';
+                $final_pdf_dest_path = $upload_dir . $final_pdf_filename;
+                
+                $merge_success = false;
+                if (!empty($body_pdf_path) && file_exists($body_pdf_path)) {
+                    $merge_success = rjpes_pdf_merge($cover_pdf_path, $body_pdf_path, $final_pdf_dest_path, $journal_number, $latest_vol, $latest_iss, date('F Y'));
+                } else {
+                    $merge_success = copy($cover_pdf_path, $final_pdf_dest_path);
+                }
+                
+                // Clean up temporary PDFs
+                @unlink($cover_pdf_path);
+                if (!empty($body_pdf_path)) {
+                    @unlink($body_pdf_path);
+                }
+                
+                if ($merge_success) {
+                    // Delete old PDF file if it exists and we are replacing it
+                    if ($is_edit && !empty($edit_journal['manuscript_file'])) {
+                        @unlink(__DIR__ . '/../' . $edit_journal['manuscript_file']);
+                    }
+                    $file_path = 'uploads/' . $final_pdf_filename;
+                } else {
+                    $message = "Failed to compile Cover Page and Manuscript PDF.";
+                    $message_type = "danger";
+                    $upload_ok = false;
+                    if ($new_photo_uploaded && !empty($author_photo_path)) {
+                        @unlink(__DIR__ . '/../' . $author_photo_path);
+                    }
                 }
             }
         }
@@ -235,6 +342,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $stmt = $pdo->prepare("UPDATE journals SET title = ?, abstract = ?, content = ?, subject_domain = ?, manuscript_file = ?, author_photo = ?, status = 'under_review', updated_at = CURRENT_TIMESTAMP WHERE id = ?");
                 $stmt->execute([$title, $abstract, $content, $subject_domain, $file_path, $author_photo_path, $edit_journal['id']]);
+                
+                // Save/update authors list in journal_authors
+                $existing_cos = [];
+                $cos_stmt = $pdo->prepare("SELECT * FROM journal_authors WHERE journal_id = ? ORDER BY order_num ASC");
+                $cos_stmt->execute([$edit_journal['id']]);
+                $existing_cos = $cos_stmt->fetchAll();
+                
+                // Primary author update
+                $primary_author_id = null;
+                foreach ($existing_cos as $ec) {
+                    if ($ec['order_num'] == 1) {
+                        $primary_author_id = $ec['id'];
+                        break;
+                    }
+                }
+                if ($primary_author_id) {
+                    $upd_pri = $pdo->prepare("UPDATE journal_authors SET name = ?, photo_path = ? WHERE id = ?");
+                    $upd_pri->execute([$user['fullname'], $author_photo_path, $primary_author_id]);
+                } else {
+                    $ins_pri = $pdo->prepare("INSERT INTO journal_authors (journal_id, name, photo_path, order_num) VALUES (?, ?, ?, 1)");
+                    $ins_pri->execute([$edit_journal['id'], $user['fullname'], $author_photo_path]);
+                }
+                
+                // Co-authors saving
+                $submitted_co_ids = [];
+                $order_num = 2;
+                if (isset($_POST['co_author_name']) && is_array($_POST['co_author_name'])) {
+                    foreach ($_POST['co_author_name'] as $idx => $name) {
+                        $name = sanitize($name);
+                        if (empty($name)) continue;
+                        
+                        $co_id = isset($_POST['co_author_id'][$idx]) ? intval($_POST['co_author_id'][$idx]) : 0;
+                        
+                        // Find matching photo path from temp_authors list
+                        $co_photo_path = null;
+                        foreach ($temp_authors as $ta) {
+                            if ($ta['order_num'] == $order_num) {
+                                $co_photo_path = $ta['photo_path'];
+                                break;
+                            }
+                        }
+                        
+                        if ($co_id > 0) {
+                            $upd_co = $pdo->prepare("UPDATE journal_authors SET name = ?, photo_path = ?, order_num = ? WHERE id = ?");
+                            $upd_co->execute([$name, $co_photo_path, $order_num, $co_id]);
+                            $submitted_co_ids[] = $co_id;
+                        } else {
+                            $ins_co = $pdo->prepare("INSERT INTO journal_authors (journal_id, name, photo_path, order_num) VALUES (?, ?, ?, ?)");
+                            $ins_co->execute([$edit_journal['id'], $name, $co_photo_path, $order_num]);
+                            $submitted_co_ids[] = $pdo->lastInsertId();
+                        }
+                        $order_num++;
+                    }
+                }
+                
+                // Delete removed co-authors
+                foreach ($existing_cos as $ec) {
+                    if ($ec['order_num'] == 1) continue;
+                    if (!in_array($ec['id'], $submitted_co_ids)) {
+                        $del_stmt = $pdo->prepare("DELETE FROM journal_authors WHERE id = ?");
+                        $del_stmt->execute([$ec['id']]);
+                        if (!empty($ec['photo_path'])) {
+                            @unlink(__DIR__ . '/../' . $ec['photo_path']);
+                        }
+                    }
+                }
                 
                 // Keep the assignment and set status back to 'assigned' so the verifier can review again
                 $reset_assignment = $pdo->prepare("UPDATE reviewer_assignments SET status = 'assigned' WHERE journal_id = ?");
@@ -297,6 +470,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $pdo->prepare("INSERT INTO journals (author_id, title, abstract, content, subject_domain, manuscript_file, author_photo, journal_number, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'submitted_waiting_review')");
                 $stmt->execute([$author_id, $title, $abstract, $content, $subject_domain, $file_path, $author_photo_path, $journal_number]);
                 $new_journal_id = $pdo->lastInsertId();
+                
+                // Save primary author in journal_authors
+                $ins_pri = $pdo->prepare("INSERT INTO journal_authors (journal_id, name, photo_path, order_num) VALUES (?, ?, ?, 1)");
+                $ins_pri->execute([$new_journal_id, $user['fullname'], $author_photo_path]);
+                
+                // Save co-authors in journal_authors
+                $order_num = 2;
+                if (isset($_POST['co_author_name']) && is_array($_POST['co_author_name'])) {
+                    foreach ($_POST['co_author_name'] as $idx => $name) {
+                        $name = sanitize($name);
+                        if (empty($name)) continue;
+                        
+                        $co_photo_path = null;
+                        foreach ($temp_authors as $ta) {
+                            if ($ta['order_num'] == $order_num) {
+                                $co_photo_path = $ta['photo_path'];
+                                break;
+                            }
+                        }
+                        
+                        $ins_co = $pdo->prepare("INSERT INTO journal_authors (journal_id, name, photo_path, order_num) VALUES (?, ?, ?, ?)");
+                        $ins_co->execute([$new_journal_id, $name, $co_photo_path, $order_num]);
+                        $order_num++;
+                    }
+                }
 
                 // Record as Version 1
                 $ins_ver = $pdo->prepare("INSERT INTO journal_versions (journal_id, version_number, manuscript_file, author_notes) VALUES (?, 1, ?, ?)");
@@ -428,6 +626,19 @@ require_once __DIR__ . '/../includes/header.php';
                     <?php endif; ?>
                 </div>
 
+                <!-- Co-Authors Dynamic Field Section -->
+                <div style="margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+                    <h3 style="font-family: var(--font-heading); color: var(--primary-color); font-size: 1.25rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                        <span>👥 Co-Authors (Optional)</span>
+                        <button type="button" class="btn btn-secondary" id="add-co-author-btn" style="padding: 6px 12px; font-size: 0.82rem; border: 1px solid var(--border-color); color: var(--primary-color); cursor: pointer; display: flex; align-items: center; gap: 5px; font-weight: 600; background: #f1f5f9; border-radius: 6px;">
+                            ➕ Add Co-Author
+                        </button>
+                    </h3>
+                    <div id="co-authors-container" style="display: flex; flex-direction: column; gap: 15px; margin-bottom: 1.5rem;">
+                        <!-- JS will inject co-author rows here -->
+                    </div>
+                </div>
+
                 <?php if ($is_edit): ?>
                 <div class="form-group">
                     <label for="author_notes">Summary of Changes Made <span style="color: var(--text-muted); font-weight: 400;">(Optional — helps the verifier understand what was revised)</span></label>
@@ -487,4 +698,64 @@ require_once __DIR__ . '/../includes/header.php';
         });
     }
 </script>
+
+<script>
+    let coAuthorIndex = 0;
+    function addCoAuthorRow(id = '', name = '', photoUrl = '') {
+        const container = document.getElementById('co-authors-container');
+        const row = document.createElement('div');
+        row.className = 'co-author-row';
+        row.style = 'display: grid; grid-template-columns: 1fr 1fr auto; gap: 15px; align-items: end; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid var(--border-color);';
+        
+        let photoPreviewHtml = '';
+        if (photoUrl) {
+            photoPreviewHtml = `<div style="margin-top: 8px;"><img src="${photoUrl}" style="max-width: 50px; max-height: 50px; border-radius: 4px; object-fit: cover; border: 1px solid var(--border-color);"></div>`;
+        }
+        
+        row.innerHTML = `
+            <input type="hidden" name="co_author_id[${coAuthorIndex}]" value="${id}">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; display: block;">Co-Author Name</label>
+                <input type="text" name="co_author_name[${coAuthorIndex}]" class="form-control" value="${name}" required placeholder="Enter co-author name" style="padding: 8px 12px; background: white;">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; display: block;">Photo (JPG/JPEG only)</label>
+                <input type="file" name="co_author_photo_${coAuthorIndex}" accept=".jpg,.jpeg" class="form-control" style="padding: 5px 10px; background: white;">
+                ${photoPreviewHtml}
+            </div>
+            <div style="margin-bottom: 3px;">
+                <button type="button" class="btn btn-danger remove-co-author" style="padding: 9px 14px; background-color: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.85rem;">Remove</button>
+            </div>
+        `;
+        
+        container.appendChild(row);
+        
+        row.querySelector('.remove-co-author').addEventListener('click', () => {
+            row.remove();
+        });
+        
+        coAuthorIndex++;
+    }
+
+    document.getElementById('add-co-author-btn').addEventListener('click', () => {
+        addCoAuthorRow();
+    });
+</script>
+
+<?php if ($is_edit): ?>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        <?php
+        $stmt = $pdo->prepare("SELECT * FROM journal_authors WHERE journal_id = ? AND order_num > 1 ORDER BY order_num ASC");
+        $stmt->execute([$edit_journal['id']]);
+        $co_authors = $stmt->fetchAll();
+        foreach ($co_authors as $ca) {
+            $photo_url = $ca['photo_path'] ? $path_prefix . $ca['photo_path'] : '';
+            echo "addCoAuthorRow(" . intval($ca['id']) . ", '" . addslashes($ca['name']) . "', '" . addslashes($photo_url) . "');\n";
+        }
+        ?>
+    });
+    </script>
+<?php endif; ?>
+
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
