@@ -143,7 +143,7 @@ function rjpes_convert_docx_to_pdf($docx_path, $pdf_path) {
         // Linux: LibreOffice headless (preserves tables, images, graphs)
         $out_dir = dirname($pdf_abs);
         
-        $cmd = "libreoffice --headless --convert-to pdf --outdir " . escapeshellarg($out_dir) . " " . escapeshellarg($docx_abs) . " 2>&1";
+        $cmd = "export HOME=/home/rjpes && export XDG_CACHE_HOME=/home/rjpes/.cache && libreoffice --headless --convert-to pdf --outdir " . escapeshellarg($out_dir) . " " . escapeshellarg($docx_abs) . " 2>&1";
         $output = shell_exec($cmd);
         
         $in_filename = pathinfo($docx_abs, PATHINFO_FILENAME);
@@ -151,7 +151,7 @@ function rjpes_convert_docx_to_pdf($docx_path, $pdf_path) {
         
         if (!file_exists($generated_pdf)) {
             // Try soffice fallback
-            $cmd = "soffice --headless --convert-to pdf --outdir " . escapeshellarg($out_dir) . " " . escapeshellarg($docx_abs) . " 2>&1";
+            $cmd = "export HOME=/home/rjpes && export XDG_CACHE_HOME=/home/rjpes/.cache && soffice --headless --convert-to pdf --outdir " . escapeshellarg($out_dir) . " " . escapeshellarg($docx_abs) . " 2>&1";
             $output = shell_exec($cmd);
         }
         
@@ -235,7 +235,8 @@ function rjpes_pdf_merge($cover_pdf_path, $body_pdf_path, $output_pdf_path, $jou
     file_put_contents($py_path, $py_content);
     
     $py_exe = (DIRECTORY_SEPARATOR === '\\') ? 'python' : 'python3';
-    $cmd = "$py_exe " . escapeshellarg($py_path) . " 2>&1";
+    $cmd_prefix = (DIRECTORY_SEPARATOR === '\\') ? '' : 'export HOME=/home/rjpes && export XDG_CACHE_HOME=/home/rjpes/.cache && ';
+    $cmd = $cmd_prefix . "$py_exe " . escapeshellarg($py_path) . " 2>&1";
     $output = shell_exec($cmd);
     @unlink($py_path);
     
@@ -299,7 +300,8 @@ function rjpes_pdf_extract_body($merged_pdf_path, $output_body_path) {
     file_put_contents($py_path, $py_content);
     
     $py_exe = (DIRECTORY_SEPARATOR === '\\') ? 'python' : 'python3';
-    $cmd = "$py_exe " . escapeshellarg($py_path) . " 2>&1";
+    $cmd_prefix = (DIRECTORY_SEPARATOR === '\\') ? '' : 'export HOME=/home/rjpes && export XDG_CACHE_HOME=/home/rjpes/.cache && ';
+    $cmd = $cmd_prefix . "$py_exe " . escapeshellarg($py_path) . " 2>&1";
     $output = shell_exec($cmd);
     @unlink($py_path);
     
