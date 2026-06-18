@@ -128,9 +128,13 @@ function rjpes_convert_docx_to_pdf($docx_path, $pdf_path) {
     $ps1_path = tempnam(sys_get_temp_dir(), 'rjpes_') . '.ps1';
     file_put_contents($ps1_path, $ps1_content);
     
-    $cmd = "powershell -ExecutionPolicy Bypass -File " . escapeshellarg($ps1_path);
-    shell_exec($cmd);
+    $cmd = "powershell -ExecutionPolicy Bypass -File " . escapeshellarg($ps1_path) . " 2>&1";
+    $output = shell_exec($cmd);
     @unlink($ps1_path);
+    
+    if (!empty($output)) {
+        error_log("PowerShell Word conversion output: " . trim($output));
+    }
     
     return file_exists($pdf_abs) && filesize($pdf_abs) > 0;
 }
