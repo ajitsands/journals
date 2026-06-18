@@ -1,97 +1,81 @@
 <?php
 /**
- * Server PDF Reprocessor — fixes Chrome font rendering on all existing manuscripts.
- * Run once at: https://rjpes.in/reprocess_pdfs.php
+ * Server PDF Reprocessor — flattens ALL body pages as standard JPEG images.
+ * Fixes Chrome/Firefox rendering for:
+ *   - MS Word PDFs with Identity-H CID fonts (Chrome PDFium cannot render)
+ *   - LibreOffice PDFs with JPEG2000 embedded content (Chrome cannot decode)
+ *   - DroidSansFallback / missing-encoding fonts (render as boxes)
+ *
+ * Run at: https://rjpes.in/reprocess_pdfs.php
  * DELETE this file after running for security.
  */
 header('Content-Type: text/plain; charset=utf-8');
 
-$root = __DIR__;
+$root    = __DIR__;
 $uploads = $root . '/uploads';
 
-echo "RJPES PDF Reprocessor\n";
-echo "======================\n\n";
+echo "RJPES PDF Reprocessor (v2 — Flatten All Body Pages)\n";
+echo "=====================================================\n\n";
 
 // 1. Check Python + fitz availability
 $py_exe = 'python3';
-$check = shell_exec("$py_exe -c \"import fitz; print('fitz-ok-' + fitz.__version__)\" 2>&1");
+$check  = shell_exec("$py_exe -c \"import fitz; print('fitz-ok-' + fitz.__version__)\" 2>&1");
 if (strpos($check, 'fitz-ok-') !== false) {
     echo "✔ PyMuPDF (fitz) available: " . trim($check) . "\n\n";
 } else {
-    echo "✘ PyMuPDF not found: " . trim($check) . "\n";
-    echo "Trying to install fitz...\n";
-    $install = shell_exec("pip3 install pymupdf 2>&1");
-    echo $install . "\n";
-    $check2 = shell_exec("$py_exe -c \"import fitz; print('fitz-ok-' . fitz.__version__)\" 2>&1");
-    if (strpos($check2, 'fitz-ok-') === false) {
-        echo "✘ Cannot proceed without PyMuPDF. Please install it on the server.\n";
-        exit(1);
-    }
-    echo "✔ PyMuPDF installed successfully.\n\n";
+    echo "✘ PyMuPDF not available: " . trim($check) . "\n";
+    echo "Install with:  pip3 install pymupdf\n";
+    exit(1);
 }
 
-// 2. Python script to flatten Identity-H CID font pages
+// 2. Python script — flatten ALL body pages as standard JPEG (no CID check needed)
 $py_script = <<<'PYEOF'
 import sys, os, fitz
 
-def has_cid_fonts(page):
-    for f in page.get_fonts():
-        enc = f[5] if len(f) > 5 else ''
-        if enc == 'Identity-H':
-            return True
-    return False
+sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 def reprocess_pdf(in_path, out_path):
+    """
+    Flatten all body pages (pages 2+) as 150 DPI grayscale JPEG images.
+    Cover page (page 1) is kept as-is (Helvetica Type1 = universally supported).
+    This fixes Chrome/Firefox rendering for JPEG2000, CID fonts, and missing encodings.
+    """
     src = fitz.open(in_path)
     out = fitz.open()
     
-    # Cover page: keep as-is (Helvetica, renders fine in all browsers)
+    # Cover page: always keep as vector (no encoding issues)
     out.insert_pdf(src, from_page=0, to_page=0)
     
     for i in range(1, len(src)):
         page = src[i]
         w = page.rect.width
         h = page.rect.height
-        if has_cid_fonts(page):
-            # Render as grayscale JPEG 150 DPI — fixes Chrome/Firefox PDF viewer
-            mat = fitz.Matrix(150 / 72, 150 / 72)
-            pix = page.get_pixmap(matrix=mat, colorspace=fitz.csGRAY, alpha=False)
-            jpg = pix.tobytes('jpeg', jpg_quality=85)
-            new_page = out.new_page(width=w, height=h)
-            new_page.insert_image(new_page.rect, stream=jpg)
-        else:
-            out.insert_pdf(src, from_page=i, to_page=i)
+        # Re-render as standard JPEG — universally supported by all PDF viewers
+        mat = fitz.Matrix(150 / 72, 150 / 72)
+        pix = page.get_pixmap(matrix=mat, colorspace=fitz.csGRAY, alpha=False)
+        jpg = pix.tobytes('jpeg', jpg_quality=85)
+        new_page = out.new_page(width=w, height=h)
+        new_page.insert_image(new_page.rect, stream=jpg)
     
     src.close()
     out.save(out_path, garbage=4, deflate=True, clean=True)
     out.close()
-    return True
 
 uploads_dir = sys.argv[1]
-pdfs = [f for f in os.listdir(uploads_dir) if f.startswith('manuscript_') and f.endswith('.pdf')]
-print(f"Found {len(pdfs)} manuscript PDFs to check")
+pdfs = sorted([f for f in os.listdir(uploads_dir) if f.startswith('manuscript_') and f.endswith('.pdf')])
+print(f"Found {len(pdfs)} manuscript PDFs to reprocess\n")
 
-fixed = 0
-skipped = 0
+fixed  = 0
 errors = 0
 for fname in pdfs:
-    in_path = os.path.join(uploads_dir, fname)
+    in_path  = os.path.join(uploads_dir, fname)
     tmp_path = in_path + '.tmp.pdf'
     try:
-        # Check if already processed (no CID fonts = already image-flattened)
-        src = fitz.open(in_path)
-        has_cid = any(has_cid_fonts(src[i]) for i in range(1, min(3, len(src))))
-        src.close()
-        
-        if not has_cid:
-            print(f"SKIP (already fixed): {fname}")
-            skipped += 1
-            continue
-        
+        in_size = os.path.getsize(in_path) // 1024
         reprocess_pdf(in_path, tmp_path)
         os.replace(tmp_path, in_path)
-        size_kb = os.path.getsize(in_path) // 1024
-        print(f"FIXED: {fname} -> {size_kb} KB")
+        out_size = os.path.getsize(in_path) // 1024
+        print(f"OK: {fname}  ({in_size} KB -> {out_size} KB)")
         fixed += 1
     except Exception as e:
         print(f"ERROR: {fname}: {e}")
@@ -99,27 +83,23 @@ for fname in pdfs:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 
-print(f"\nDone: {fixed} fixed, {skipped} skipped, {errors} errors")
+print(f"\nDone: {fixed} reprocessed, {errors} errors")
 PYEOF;
 
-$py_path = sys_get_temp_dir() . '/rjpes_reprocess_' . time() . '.py';
+$py_path = sys_get_temp_dir() . '/rjpes_reprocess2_' . time() . '.py';
 file_put_contents($py_path, $py_script);
 
-echo "3. Reprocessing manuscripts in: $uploads\n";
+echo "Reprocessing manuscripts in: $uploads\n";
 echo "----------------------------------------------\n";
 
-// Run with output buffering disabled for real-time output
-$cmd = "$py_exe " . escapeshellarg($py_path) . " " . escapeshellarg($uploads) . " 2>&1";
-
+$cmd  = "$py_exe " . escapeshellarg($py_path) . " " . escapeshellarg($uploads) . " 2>&1";
 $proc = popen($cmd, 'r');
 if ($proc) {
     while (!feof($proc)) {
         $line = fgets($proc, 256);
         if ($line !== false) {
             echo $line;
-            if (ob_get_level() > 0) {
-                ob_flush();
-            }
+            if (ob_get_level() > 0) ob_flush();
             flush();
         }
     }
@@ -130,6 +110,6 @@ if ($proc) {
 
 @unlink($py_path);
 
-echo "\n======================\n";
-echo "✔ Reprocessing complete. You can DELETE this file now.\n";
+echo "\n=====================================================\n";
+echo "✔ Done. Please DELETE this file from the server now.\n";
 ?>
