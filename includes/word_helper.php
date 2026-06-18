@@ -83,10 +83,9 @@ function rjpes_read_doc($file_path) {
 }
 
 /**
- * Convert DOCX to PDF by reading DOCX XML and re-typesetting with PyMuPDF (fitz).
- * Uses ONLY standard PDF Type1 fonts (Times-Roman, Times-Bold, Helvetica) which
- * are supported by EVERY PDF viewer (Chrome, Firefox, Safari, Adobe Reader) without
- * any font embedding. This permanently eliminates all font rendering issues.
+ * Convert DOCX/DOC to PDF using MS Word (Windows) or LibreOffice (Linux).
+ * These converters preserve tables, images, graphs, and all formatting.
+ * Font rendering issues are fixed later during the merge step (flatten to JPEG).
  *
  * @param string $docx_path
  * @param string $pdf_path
@@ -97,13 +96,14 @@ function rjpes_convert_docx_to_pdf($docx_path, $pdf_path) {
     if (!$docx_abs) {
         return false;
     }
-
+    
     // Ensure output directory exists
     $pdf_dir = dirname($pdf_path);
     if (!file_exists($pdf_dir)) {
         mkdir($pdf_dir, 0777, true);
     }
-
+    
+    // Realpath for target PDF path or directory
     $pdf_abs = $pdf_path;
     if (file_exists($pdf_path)) {
         $pdf_abs = realpath($pdf_path);
@@ -114,190 +114,56 @@ function rjpes_convert_docx_to_pdf($docx_path, $pdf_path) {
             $pdf_abs = $dir_real . DIRECTORY_SEPARATOR . basename($pdf_path);
         }
     }
-
-    // Python script: read DOCX XML → re-typeset → PDF using standard fonts only
-    $py = <<<'PYEOF'
-import sys, zipfile, re
-import xml.etree.ElementTree as ET
-import fitz
-
-sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-
-DOCX = sys.argv[1]
-PDF  = sys.argv[2]
-
-WNS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
-
-def tag(el):
-    return el.tag.split('}')[1] if '}' in el.tag else el.tag
-
-def w(name): return f'{{{WNS}}}{name}'
-
-# ── Read DOCX XML ────────────────────────────────────────────────────
-try:
-    with zipfile.ZipFile(DOCX) as z:
-        with z.open('word/document.xml') as f:
-            root = ET.fromstring(f.read())
-except Exception as e:
-    print(f'error reading docx: {e}')
-    sys.exit(1)
-
-# ── Extract paragraphs with run-level bold/italic ────────────────────
-paragraphs = []
-body = root.find(w('body'))
-if body is None:
-    body = root
-
-for para in body.findall('.//' + w('p')):
-    pPr   = para.find(w('pPr'))
-    style = ''
-    align = 'left'
-    if pPr is not None:
-        ps = pPr.find(w('pStyle'))
-        if ps is not None:
-            style = (ps.get(w('val')) or '').lower()
-        jc = pPr.find(w('jc'))
-        if jc is not None:
-            align = (jc.get(w('val')) or 'left').lower()
-
-    runs = []
-    for r in para.findall('.//' + w('r')):
-        txt = ''.join((t.text or '') for t in r.findall(w('t')))
-        if not txt:
-            continue
-        rPr   = r.find(w('rPr'))
-        bold  = rPr is not None and rPr.find(w('b'))  is not None
-        ital  = rPr is not None and rPr.find(w('i'))  is not None
-        runs.append((txt, bold, ital))
-
-    full = ''.join(r[0] for r in runs).strip()
-    if full:
-        paragraphs.append({'text': full, 'runs': runs, 'style': style, 'align': align})
-
-# ── PDF layout constants (A4) ────────────────────────────────────────
-PW, PH   = 595, 842
-ML, MR   = 72, 72
-MT, MB   = 80, 72
-TW       = PW - ML - MR   # usable text width
-
-# Standard PDF Type1 fonts — built into every viewer, never need embedding
-F_NORMAL = 'tiro'    # Times-Roman
-F_BOLD   = 'tibo'    # Times-Bold
-F_ITALIC = 'tiit'    # Times-Italic
-F_BI     = 'tibi'    # Times-BoldItalic
-BASE     = 11.0
-
-def pick_font(bold, ital):
-    if bold and ital: return F_BI
-    if bold:          return F_BOLD
-    if ital:          return F_ITALIC
-    return F_NORMAL
-
-def para_fontsize(style):
-    if style in ('heading1','1'): return 15.0
-    if style in ('heading2','2'): return 13.0
-    if style in ('heading3','3'): return 12.0
-    return BASE
-
-def measure(text, fontname, fontsize):
-    """Return width of text using fitz font metrics."""
-    try:
-        fo = fitz.Font(fontname=fontname)
-        return fo.text_length(text, fontsize)
-    except Exception:
-        return len(text) * fontsize * 0.55   # rough fallback
-
-def wrap_text(text, fontname, fontsize, max_width):
-    """Word-wrap text and return list of lines."""
-    words  = text.split()
-    lines  = []
-    cur    = ''
-    for word in words:
-        candidate = (cur + ' ' + word).strip() if cur else word
-        if measure(candidate, fontname, fontsize) <= max_width:
-            cur = candidate
-        else:
-            if cur:
-                lines.append(cur)
-            cur = word
-    if cur:
-        lines.append(cur)
-    return lines or ['']
-
-# ── Build PDF ────────────────────────────────────────────────────────
-doc  = fitz.open()
-page = doc.new_page(width=PW, height=PH)
-y    = float(MT)
-
-def ensure_space(needed):
-    global page, y
-    if y + needed > PH - MB:
-        page = doc.new_page(width=PW, height=PH)
-        y    = float(MT)
-
-for para in paragraphs:
-    style    = para['style']
-    align    = para['align']
-    runs     = para['runs']
-    fontsize = para_fontsize(style)
-    lh       = fontsize * 1.5    # line height
-
-    # Determine dominant font for the paragraph (used for wrapping)
-    has_bold = any(r[1] for r in runs)
-    has_ital = any(r[2] for r in runs)
-    dom_font = pick_font(has_bold, has_ital)
-
-    is_heading = style.startswith('heading') or style in ('title',)
-    if is_heading:
-        ensure_space(lh * 2)
-        y += lh * 0.4
-
-    # Wrap full text using dominant font
-    full_text = para['text']
-    lines     = wrap_text(full_text, dom_font, fontsize, TW)
-
-    for li, line in enumerate(lines):
-        ensure_space(lh)
-        tw_line = measure(line, dom_font, fontsize)
-        if align in ('center',):
-            x = ML + max(0, (TW - tw_line) / 2.0)
-        elif align in ('right',):
-            x = ML + max(0, TW - tw_line)
-        else:
-            x = float(ML)
-
-        page.insert_text(
-            (x, y + fontsize),
-            line,
-            fontsize=fontsize,
-            fontname=dom_font,
-            color=(0, 0, 0)
-        )
-        y += lh
-
-    y += fontsize * 0.5   # paragraph gap
-
-doc.save(PDF, garbage=4, deflate=True, clean=True)
-doc.close()
-print('success')
-PYEOF;
-
-    $py_path = tempnam(sys_get_temp_dir(), 'rjpes_docx2pdf_') . '.py';
-    file_put_contents($py_path, $py);
-
-    $py_exe = (DIRECTORY_SEPARATOR === '\\') ? 'python' : 'python3';
-    $cmd    = "$py_exe " . escapeshellarg($py_path)
-            . " " . escapeshellarg($docx_abs)
-            . " " . escapeshellarg($pdf_abs)
-            . " 2>&1";
-    $output = shell_exec($cmd);
-    @unlink($py_path);
-
-    if (strpos($output, 'success') === false) {
-        error_log("DOCX→PDF conversion failed: " . trim($output));
-        return false;
+    
+    if (DIRECTORY_SEPARATOR === '\\') {
+        // Windows: MS Word COM Automation (preserves all formatting)
+        $ps1_content = "\$word = New-Object -ComObject Word.Application\n";
+        $ps1_content .= "\$word.Visible = \$false\n";
+        $ps1_content .= "try {\n";
+        $ps1_content .= "    \$doc = \$word.Documents.Open(\"" . addslashes($docx_abs) . "\")\n";
+        $ps1_content .= "    \$doc.SaveAs(\"" . addslashes($pdf_abs) . "\", 17)\n";
+        $ps1_content .= "    \$doc.Close()\n";
+        $ps1_content .= "} catch {\n";
+        $ps1_content .= "    Write-Error \$_.Exception.Message\n";
+        $ps1_content .= "} finally {\n";
+        $ps1_content .= "    \$word.Quit()\n";
+        $ps1_content .= "}\n";
+        
+        $ps1_path = tempnam(sys_get_temp_dir(), 'rjpes_') . '.ps1';
+        file_put_contents($ps1_path, $ps1_content);
+        
+        $cmd = "powershell -ExecutionPolicy Bypass -File " . escapeshellarg($ps1_path) . " 2>&1";
+        $output = shell_exec($cmd);
+        @unlink($ps1_path);
+        
+        if (!empty($output)) {
+            error_log("PowerShell Word conversion output: " . trim($output));
+        }
+    } else {
+        // Linux: LibreOffice headless (preserves tables, images, graphs)
+        $out_dir = dirname($pdf_abs);
+        
+        $cmd = "libreoffice --headless --convert-to pdf --outdir " . escapeshellarg($out_dir) . " " . escapeshellarg($docx_abs) . " 2>&1";
+        $output = shell_exec($cmd);
+        
+        $in_filename = pathinfo($docx_abs, PATHINFO_FILENAME);
+        $generated_pdf = $out_dir . DIRECTORY_SEPARATOR . $in_filename . '.pdf';
+        
+        if (!file_exists($generated_pdf)) {
+            // Try soffice fallback
+            $cmd = "soffice --headless --convert-to pdf --outdir " . escapeshellarg($out_dir) . " " . escapeshellarg($docx_abs) . " 2>&1";
+            $output = shell_exec($cmd);
+        }
+        
+        if (file_exists($generated_pdf)) {
+            if (realpath($generated_pdf) !== realpath($pdf_abs)) {
+                @rename($generated_pdf, $pdf_abs);
+            }
+        } else {
+            error_log("Linux PDF conversion failed. Command: $cmd, Output: " . trim($output));
+        }
     }
-
+    
     return file_exists($pdf_abs) && filesize($pdf_abs) > 0;
 }
 
@@ -358,10 +224,24 @@ function rjpes_pdf_merge($cover_pdf_path, $body_pdf_path, $output_pdf_path, $jou
     $py_content .= "        page_text = f\"Page {i + 1}\"\n";
     $py_content .= "        page.insert_text((width - 95, height - 40), page_text, fontsize=8, fontname=\"helv\", color=(0, 0, 0))\n";
     $py_content .= "    \n";
-    $py_content .= "    # 3. Save — body already uses standard Type1 fonts (Times/Helvetica),\n";
-    $py_content .= "    #    no flattening needed. These fonts render in every browser.\n";
-    $py_content .= "    doc.save(\"" . addslashes($out_abs) . "\", garbage=4, deflate=True, clean=True)\n";
+    $py_content .= "    # 3. Flatten ALL body pages as 200 DPI RGB JPEG images.\n";
+    $py_content .= "    #    This preserves tables, images, graphs from LibreOffice/MS Word\n";
+    $py_content .= "    #    while eliminating JPEG2000 and CID font issues in Chrome/Firefox.\n";
+    $py_content .= "    #    Cover page (page 1) is kept as vector (Helvetica Type1 = universal).\n";
+    $py_content .= "    out = fitz.open()\n";
+    $py_content .= "    out.insert_pdf(doc, from_page=0, to_page=0)\n";
+    $py_content .= "    for i in range(1, len(doc)):\n";
+    $py_content .= "        page = doc[i]\n";
+    $py_content .= "        w = page.rect.width\n";
+    $py_content .= "        h = page.rect.height\n";
+    $py_content .= "        mat = fitz.Matrix(200 / 72, 200 / 72)\n";
+    $py_content .= "        pix = page.get_pixmap(matrix=mat, alpha=False)\n";
+    $py_content .= "        jpg = pix.tobytes('jpeg', jpg_quality=90)\n";
+    $py_content .= "        new_page = out.new_page(width=w, height=h)\n";
+    $py_content .= "        new_page.insert_image(new_page.rect, stream=jpg)\n";
     $py_content .= "    doc.close()\n";
+    $py_content .= "    out.save(\"" . addslashes($out_abs) . "\", garbage=4, deflate=True, clean=True)\n";
+    $py_content .= "    out.close()\n";
     $py_content .= "    print('success')\n";
     $py_content .= "except Exception as e:\n";
     $py_content .= "    print('error:', str(e))\n";
