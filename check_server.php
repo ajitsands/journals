@@ -89,6 +89,16 @@ libreoffice --version</pre>
         <p>Once installed, refresh this page to confirm that <code>libreoffice</code> status changes to **Available**.</p>
     </div>
 
+    <!-- SECTION 4: INSTALLED FONTS AUDIT -->
+    <div class="card">
+        <h2>4. Fonts Audit (fc-list)</h2>
+        <p>These are the fonts currently detected by fontconfig and visible to the web user inside the sandbox:</p>
+        <pre><?php
+            $font_list = shell_exec('fc-list : family | sort -u | head -n 100 2>&1');
+            echo htmlspecialchars(trim($font_list) ?: 'No fonts detected.');
+        ?></pre>
+    </div>
+
     <p style="color: var(--text-muted); font-size: 0.85rem; text-align: center;">Note: Delete this <code>check_server.php</code> file from your server after diagnostics are complete.</p>
 </body>
 </html>
