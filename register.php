@@ -4,13 +4,18 @@ require_once __DIR__ . '/includes/header.php';
 
 $message = "";
 $message_type = "";
+$role = 'author';
+
+if (isset($_GET['role']) && $_GET['role'] === 'reviewer') {
+    $role = 'reviewer';
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = sanitize($_POST['username']);
     $email = sanitize($_POST['email']);
     $password = $_POST['password']; // Don't sanitize passwords
     $fullname = sanitize($_POST['fullname']);
-    $role = sanitize($_POST['role']);
+    $role = sanitize($_POST['role'] ?? 'author');
     $subject_domain = sanitize($_POST['subject_domain'] ?? '');
     $phone = sanitize($_POST['phone'] ?? '');
 
@@ -175,13 +180,16 @@ main { position: relative; z-index: 1; }
 
             <div class="form-group">
                 <label for="role">Register As</label>
-                <!-- Registration is for Authors only. Verifiers are added by the Admin. -->
-                <input type="hidden" name="role" value="author">
+                <input type="hidden" name="role" value="<?php echo htmlspecialchars($role); ?>">
                 <div class="form-control" style="background: #f8fafc; color: var(--text-muted); cursor: not-allowed; display: flex; align-items: center; gap: 8px;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                    <strong>Author</strong>&nbsp;<span style="font-size: 0.85rem;">(Submit Research Papers)</span>
+                    <?php if ($role === 'reviewer'): ?>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                        <strong>Reviewer</strong>&nbsp;<span style="font-size: 0.85rem;">(Verify / Peer Review Research Papers)</span>
+                    <?php else: ?>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <strong>Author</strong>&nbsp;<span style="font-size: 0.85rem;">(Submit Research Papers)</span>
+                    <?php endif; ?>
                 </div>
-
             </div>
 
             <div class="form-group" id="domainGroup">

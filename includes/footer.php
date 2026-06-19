@@ -70,7 +70,7 @@ if (isset($pdo)) {
             <div class="footer-column">
                 <h4>Reviewers</h4>
                 <ul style="font-size: 0.85rem; line-height: 1.8;">
-                    <li><a href="<?php echo $path_prefix; ?>register.php">Join as a Reviewer</a></li>
+                    <li><a href="<?php echo $path_prefix; ?>register.php?role=reviewer">Join as a Reviewer</a></li>
                     <li><a href="<?php echo $path_prefix; ?>#">Editors & Reviewers</a></li>
                     <li><a href="<?php echo $path_prefix; ?>#">Reviewer Referral Program</a></li>
                     <li><a href="<?php echo $path_prefix; ?>#">Get Reviewer Membership Certi.</a></li>
