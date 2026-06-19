@@ -208,7 +208,15 @@ main { position: relative; z-index: 1; }
                 </select>
             </div>
 
-            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem; padding: 14px;">Sign Up</button>
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem; padding: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <line x1="20" y1="8" x2="20" y2="14"></line>
+                    <line x1="23" y1="11" x2="17" y2="11"></line>
+                </svg>
+                Sign Up
+            </button>
         </form>
 
         <p style="text-align: center; margin-top: 1.5rem; font-size: 0.9rem; color: var(--text-muted);">
