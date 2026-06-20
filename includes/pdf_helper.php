@@ -95,6 +95,48 @@ class RJPES_PDF {
     }
 
     /**
+     * Splits text into paragraphs, and then splits each paragraph into lines
+     */
+    private function split_text_to_paragraphs_lines($text, $font_size, $max_width) {
+        $char_width = $font_size * 0.52;
+        $max_chars = floor($max_width / $char_width);
+        
+        $paragraphs_lines = [];
+        $paragraphs = explode("\n", $text);
+        
+        foreach ($paragraphs as $paragraph) {
+            $paragraph = trim($paragraph);
+            if (empty($paragraph)) {
+                continue;
+            }
+            
+            $words = explode(' ', $paragraph);
+            $current_line = '';
+            $p_lines = [];
+            
+            foreach ($words as $word) {
+                $test_line = empty($current_line) ? $word : $current_line . ' ' . $word;
+                if (strlen($test_line) > $max_chars) {
+                    if (!empty($current_line)) {
+                        $p_lines[] = $current_line;
+                        $current_line = $word;
+                    } else {
+                        $p_lines[] = $word;
+                        $current_line = '';
+                    }
+                } else {
+                    $current_line = $test_line;
+                }
+            }
+            if (!empty($current_line)) {
+                $p_lines[] = $current_line;
+            }
+            $paragraphs_lines[] = $p_lines;
+        }
+        return $paragraphs_lines;
+    }
+
+    /**
      * Cleans HTML content for display as plain text in PDF
      */
     private function clean_html_for_pdf($html) {
@@ -417,66 +459,45 @@ class RJPES_PDF {
         $content_stream .= "ET\n";
         
         $current_y -= 18;
-        $abstract_lines = $this->split_text_to_lines($abstract, 10, $max_width);
-        foreach ($abstract_lines as $ab_line) {
-            if ($current_y < $this->margin_bottom) {
-                // If abstract is too long, we keep rendering on new page but for most abstracts it fits.
-                // Simple generator targets single page for abstract and moves content down.
+        $abstract_paragraphs = $this->split_text_to_paragraphs_lines($abstract, 10, $max_width);
+        foreach ($abstract_paragraphs as $p_idx => $p_lines) {
+            $num_lines = count($p_lines);
+            foreach ($p_lines as $line_idx => $ab_line) {
+                if ($current_y < $this->margin_bottom) {
+                    // Page handling fallback
+                }
+                
+                $num_spaces = substr_count($ab_line, ' ');
+                $is_last_line = ($line_idx === $num_lines - 1);
+                
+                $content_stream .= "BT\n";
+                $content_stream .= "0 g\n"; // Black text
+                $content_stream .= "/F1 10 Tf\n";
+                
+                if (!$is_last_line && $num_spaces > 0) {
+                    $width = $this->get_text_width($ab_line, 10);
+                    $remaining_width = $max_width - $width;
+                    $word_spacing = max(0, $remaining_width / $num_spaces);
+                    $content_stream .= sprintf("%.3f Tw\n", $word_spacing);
+                }
+                
+                $content_stream .= "54 " . $current_y . " Td (" . $this->escape_text($ab_line) . ") Tj\n";
+                
+                if (!$is_last_line && $num_spaces > 0) {
+                    $content_stream .= "0 Tw\n";
+                }
+                
+                $content_stream .= "ET\n";
+                $current_y -= 14;
             }
-            $content_stream .= "BT\n";
-            $content_stream .= "0 g\n"; // Black text
-            $content_stream .= "/F1 10 Tf\n";
-            $content_stream .= "54 " . $current_y . " Td (" . $this->escape_text($ab_line) . ") Tj\n";
-            $content_stream .= "ET\n";
-            $current_y -= 14;
+            // Add space between paragraphs
+            if ($p_idx < count($abstract_paragraphs) - 1) {
+                $current_y -= 6;
+            }
         }
         
         $content_stream .= "0.5 w\n";
         $content_stream .= "54 " . ($current_y - 5) . " m 541 " . ($current_y - 5) . " l S\n";
-
-        // Add signature and editor name to the bottom of the first page
-        $editor_name = rjpes_get_setting('editor_name', 'Prof. (Dr.) Biju Lona K.');
-        $sig_path = rjpes_get_setting('editor_signature', '');
-        $has_sig = !empty($sig_path);
-        
-        $content_stream .= "0.5 w\n";
-        $content_stream .= "54 130 m 541 130 l S\n"; // Divider line above signature area
-        
-        if ($has_sig) {
-            $sig_abs_path = __DIR__ . '/../' . ltrim(str_replace(['/', '\\'], '/', $sig_path), '/');
-            $img_w = 150;
-            $img_h = 50;
-            if (file_exists($sig_abs_path)) {
-                $info = @getimagesize($sig_abs_path);
-                if ($info) {
-                    $img_w = $info[0];
-                    $img_h = $info[1];
-                }
-            }
-            $max_sig_h = 30;
-            $max_sig_w = 120;
-            $scale = min($max_sig_w / $img_w, $max_sig_h / $img_h);
-            $draw_w = $img_w * $scale;
-            $draw_h = $img_h * $scale;
-            
-            $sig_y = 90;
-            $content_stream .= "q\n";
-            $content_stream .= sprintf("%.2f 0 0 %.2f 380 %.2f cm\n", $draw_w, $draw_h, $sig_y);
-            $content_stream .= "/SigImg Do\n";
-            $content_stream .= "Q\n";
-        }
-        
-        $content_stream .= "BT\n";
-        $content_stream .= "0.1 g\n";
-        $content_stream .= "/F2 9.5 Tf\n";
-        $content_stream .= "380 75 Td (" . $this->escape_text($editor_name) . ") Tj\n";
-        $content_stream .= "ET\n";
-        
-        $content_stream .= "BT\n";
-        $content_stream .= "0.4 g\n";
-        $content_stream .= "/F1 8.5 Tf\n";
-        $content_stream .= "380 62 Td (Editor-in-Chief, RJPES) Tj\n";
-        $content_stream .= "ET\n";
         
         // Add footer to first page
         $content_stream .= "BT\n";
