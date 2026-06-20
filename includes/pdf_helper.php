@@ -177,6 +177,33 @@ class RJPES_PDF {
     }
 
     /**
+     * Normalizes spacing and removes single newlines within paragraphs
+     */
+    private function normalize_newlines($text) {
+        $text = str_replace("\r", "", $text);
+        
+        // Replace non-breaking spaces and double-byte spaces with standard spaces
+        $text = str_replace(array("\xC2\xA0", "\xA0", "&nbsp;"), " ", $text);
+        
+        // Replace paragraph breaks with a unique token
+        $text = preg_replace("/\n\n+/", "##P_BREAK##", $text);
+        
+        // Replace single newlines with standard space
+        $text = str_replace("\n", " ", $text);
+        
+        // Replace multiple consecutive spaces with a single space
+        $text = preg_replace("/ +/", " ", $text);
+        
+        // Restore paragraph breaks
+        $text = str_replace("##P_BREAK##", "\n\n", $text);
+        
+        // Clean up spaces around paragraph breaks
+        $text = preg_replace("/\s*\n\n\s*/", "\n\n", $text);
+        
+        return trim($text);
+    }
+
+    /**
      * Cleans HTML content for display as plain text in PDF
      */
     private function clean_html_for_pdf($html) {
@@ -287,7 +314,7 @@ class RJPES_PDF {
         $author = html_entity_decode($journal['author_name'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $domain = html_entity_decode($journal['subject_domain'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $number = $journal['journal_number'];
-        $abstract = $this->clean_html_for_pdf(html_entity_decode($journal['abstract'], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $abstract = $this->normalize_newlines($this->clean_html_for_pdf(html_entity_decode($journal['abstract'], ENT_QUOTES | ENT_HTML5, 'UTF-8')));
         $content = $this->clean_html_for_pdf($journal['content'] ?? '');
         $volume = $journal['volume'] ?? '20';
         $issue = $journal['issue'] ?? '1';
