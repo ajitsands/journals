@@ -594,7 +594,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <textarea name="abstract" id="abstract" class="form-control" rows="8" placeholder="Provide a concise abstract of your paper (around 150-250 words) outlining background, methods, results, and conclusion." required><?php echo $is_edit ? sanitize($edit_journal['abstract']) : ''; ?></textarea>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group" style="display: none;">
                     <label for="content">Full Text Content (Optional - for direct HTML/PDF rendering)</label>
                     <textarea name="content" id="content" class="form-control" rows="12" placeholder="You can paste the text content of your full paper here for direct display in the web portal."><?php echo $is_edit ? sanitize($edit_journal['content']) : ''; ?></textarea>
                 </div>
@@ -677,23 +677,23 @@ require_once __DIR__ . '/../includes/header.php';
 
 <script src="https://cdn.ckeditor.com/ckeditor5/40.0.0/classic/ckeditor.js"></script>
 <script>
-    let editorInstance;
+    let abstractEditorInstance;
     ClassicEditor
-        .create(document.querySelector('#content'), {
+        .create(document.querySelector('#abstract'), {
             toolbar: ['heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', 'blockQuote', 'undo', 'redo']
         })
         .then(editor => {
-            editorInstance = editor;
+            abstractEditorInstance = editor;
         })
         .catch(error => {
             console.error(error);
         });
 
-    const textarea = document.querySelector('#content');
-    if (textarea && textarea.form) {
-        textarea.form.addEventListener('submit', function() {
-            if (editorInstance) {
-                textarea.value = editorInstance.getData();
+    const abstractTextarea = document.querySelector('#abstract');
+    if (abstractTextarea && abstractTextarea.form) {
+        abstractTextarea.form.addEventListener('submit', function() {
+            if (abstractEditorInstance) {
+                abstractTextarea.value = abstractEditorInstance.getData();
             }
         });
     }

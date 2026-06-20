@@ -287,7 +287,7 @@ class RJPES_PDF {
         $author = html_entity_decode($journal['author_name'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $domain = html_entity_decode($journal['subject_domain'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $number = $journal['journal_number'];
-        $abstract = html_entity_decode($journal['abstract'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $abstract = $this->clean_html_for_pdf(html_entity_decode($journal['abstract'], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
         $content = $this->clean_html_for_pdf($journal['content'] ?? '');
         $volume = $journal['volume'] ?? '20';
         $issue = $journal['issue'] ?? '1';
@@ -397,7 +397,7 @@ class RJPES_PDF {
         $content_stream .= "0 g\n";
         
         foreach ($authors_list as $i => $auth) {
-            $p_x = 541 - ($i + 1) * $p_w - $i * $gap;
+            $p_x = $leftmost_x + $i * ($p_w + $gap);
             
             // Check if this author has an embedded photo
             $photo_ref = null;
