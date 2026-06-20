@@ -55,10 +55,6 @@ class RJPES_PDF {
      * Splits text into lines fitting the page width
      */
     private function split_text_to_lines($text, $font_size, $max_width) {
-        // Average char width factor for Helvetica is roughly 0.5 * font_size
-        $char_width = $font_size * 0.52;
-        $max_chars = floor($max_width / $char_width);
-        
         $lines = [];
         $paragraphs = explode("\n", $text);
         
@@ -69,19 +65,42 @@ class RJPES_PDF {
                 continue;
             }
             
+            $paragraph = html_entity_decode($paragraph, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            
             $words = explode(' ', $paragraph);
             $current_line = '';
             
             foreach ($words as $word) {
                 $test_line = empty($current_line) ? $word : $current_line . ' ' . $word;
-                if (strlen($test_line) > $max_chars) {
+                if ($this->get_text_width($test_line, $font_size) > $max_width) {
                     if (!empty($current_line)) {
                         $lines[] = $current_line;
                         $current_line = $word;
                     } else {
-                        // Word itself is wider than line, force wrap it
-                        $lines[] = $word;
-                        $current_line = '';
+                        // Word itself is wider than line, handle hyphens
+                        if (strpos($word, '-') !== false) {
+                            $subwords = explode('-', $word);
+                            $temp_line = '';
+                            foreach ($subwords as $idx => $subword) {
+                                $connector = ($idx === count($subwords) - 1) ? '' : '-';
+                                $test_sub = $temp_line . $subword . $connector;
+                                if ($this->get_text_width($test_sub, $font_size) > $max_width) {
+                                    if (!empty($temp_line)) {
+                                        $lines[] = $temp_line;
+                                        $temp_line = $subword . $connector;
+                                    } else {
+                                        $lines[] = $subword . $connector;
+                                        $temp_line = '';
+                                    }
+                                } else {
+                                    $temp_line = $test_sub;
+                                }
+                            }
+                            $current_line = $temp_line;
+                        } else {
+                            $lines[] = $word;
+                            $current_line = '';
+                        }
                     }
                 } else {
                     $current_line = $test_line;
@@ -98,9 +117,6 @@ class RJPES_PDF {
      * Splits text into paragraphs, and then splits each paragraph into lines
      */
     private function split_text_to_paragraphs_lines($text, $font_size, $max_width) {
-        $char_width = $font_size * 0.52;
-        $max_chars = floor($max_width / $char_width);
-        
         $paragraphs_lines = [];
         $paragraphs = explode("\n", $text);
         
@@ -110,19 +126,43 @@ class RJPES_PDF {
                 continue;
             }
             
+            $paragraph = html_entity_decode($paragraph, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            
             $words = explode(' ', $paragraph);
             $current_line = '';
             $p_lines = [];
             
             foreach ($words as $word) {
                 $test_line = empty($current_line) ? $word : $current_line . ' ' . $word;
-                if (strlen($test_line) > $max_chars) {
+                if ($this->get_text_width($test_line, $font_size) > $max_width) {
                     if (!empty($current_line)) {
                         $p_lines[] = $current_line;
                         $current_line = $word;
                     } else {
-                        $p_lines[] = $word;
-                        $current_line = '';
+                        // Word itself is wider than line, handle hyphens
+                        if (strpos($word, '-') !== false) {
+                            $subwords = explode('-', $word);
+                            $temp_line = '';
+                            foreach ($subwords as $idx => $subword) {
+                                $connector = ($idx === count($subwords) - 1) ? '' : '-';
+                                $test_sub = $temp_line . $subword . $connector;
+                                if ($this->get_text_width($test_sub, $font_size) > $max_width) {
+                                    if (!empty($temp_line)) {
+                                        $p_lines[] = $temp_line;
+                                        $temp_line = $subword . $connector;
+                                    } else {
+                                        $p_lines[] = $subword . $connector;
+                                        $temp_line = '';
+                                    }
+                                } else {
+                                    $temp_line = $test_sub;
+                                }
+                            }
+                            $current_line = $temp_line;
+                        } else {
+                            $p_lines[] = $word;
+                            $current_line = '';
+                        }
                     }
                 } else {
                     $current_line = $test_line;
@@ -243,11 +283,11 @@ class RJPES_PDF {
      * Build the PDF document contents
      */
     public function generate($journal) {
-        $title = $journal['title'];
-        $author = $journal['author_name'];
-        $domain = $journal['subject_domain'];
+        $title = html_entity_decode($journal['title'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $author = html_entity_decode($journal['author_name'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $domain = html_entity_decode($journal['subject_domain'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $number = $journal['journal_number'];
-        $abstract = $journal['abstract'];
+        $abstract = html_entity_decode($journal['abstract'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $content = $this->clean_html_for_pdf($journal['content'] ?? '');
         $volume = $journal['volume'] ?? '20';
         $issue = $journal['issue'] ?? '1';
@@ -411,7 +451,7 @@ class RJPES_PDF {
             }
             
             // Draw name centered under photo/placeholder
-            $auth_name = $auth['name'];
+            $auth_name = html_entity_decode($auth['name'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
             $font_size = 7.5;
             $name_parts = explode(' ', $auth_name);
             if (count($name_parts) > 1 && $this->get_text_width($auth_name, $font_size) > $p_w + 10) {
