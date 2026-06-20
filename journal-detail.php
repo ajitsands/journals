@@ -82,7 +82,7 @@ require_once __DIR__ . '/includes/header.php';
                     Status: <?php echo str_replace('_', ' ', $journal['status']); ?>
                 </span>
                 <div style="font-size: 0.85rem; font-weight: 600; color: var(--accent-color); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
-                    Journal ID: <?php echo sanitize($journal['journal_number']); ?> | ISSN: 0975-4687
+                    Journal ID: <?php echo sanitize($journal['journal_number']); ?> | ISSN: 0975-4687<?php if ($journal['start_page'] !== null && $journal['end_page'] !== null): ?> | Page: pp. <?php echo $journal['start_page']; ?>-<?php echo $journal['end_page']; ?><?php endif; ?>
                 </div>
             </div>
             
@@ -211,7 +211,7 @@ require_once __DIR__ . '/includes/header.php';
 
         <?php if ($journal['status'] === 'published' && !empty($journal['volume'])): ?>
             <div style="margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); font-size: 0.85rem; color: var(--text-muted); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
-                <p>Published in: <strong>RJPES Volume <?php echo sanitize($journal['volume']); ?>, Issue <?php echo sanitize($journal['issue']); ?> (<?php echo date('F Y', strtotime($journal['published_at'])); ?>)</strong></p>
+                <p>Published in: <strong>RJPES Volume <?php echo sanitize($journal['volume']); ?>, Issue <?php echo sanitize($journal['issue']); ?> (<?php echo date('F Y', strtotime($journal['published_at'])); ?>)</strong><?php if ($journal['start_page'] !== null && $journal['end_page'] !== null): ?> &bull; <strong>pp. <?php echo $journal['start_page']; ?>-<?php echo $journal['end_page']; ?></strong><?php endif; ?></p>
                 <p>Published Date: <strong><?php echo date('d M Y', strtotime($journal['published_at'])); ?></strong></p>
             </div>
         <?php endif; ?>

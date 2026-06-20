@@ -176,7 +176,7 @@ function rjpes_convert_docx_to_pdf($docx_path, $pdf_path) {
  * @param string $output_pdf_path
  * @return bool
  */
-function rjpes_pdf_merge($cover_pdf_path, $body_pdf_path, $output_pdf_path, $journal_number = '', $volume = '', $issue = '', $month_year = '') {
+function rjpes_pdf_merge($cover_pdf_path, $body_pdf_path, $output_pdf_path, $journal_number = '', $volume = '', $issue = '', $month_year = '', $start_page = null) {
     $cover_abs = realpath($cover_pdf_path);
     $body_abs = realpath($body_pdf_path);
     if (!$cover_abs || !$body_abs) {
@@ -212,6 +212,18 @@ function rjpes_pdf_merge($cover_pdf_path, $body_pdf_path, $output_pdf_path, $jou
     $py_content .= "    \n";
     $py_content .= "    # 2. Add RJPES header, separator line, footer, and page numbers to body pages\n";
     $py_content .= "    total_pages = len(doc)\n";
+    $py_content .= "    start_pg = " . ($start_page !== null ? intval($start_page) : "None") . "\n";
+    $py_content .= "    \n";
+    $py_content .= "    # Draw page number on cover page (index 0) if start_pg is set\n";
+    $py_content .= "    if start_pg is not None:\n";
+    $py_content .= "        cov_page = doc[0]\n";
+    $py_content .= "        w_cov = cov_page.rect.width\n";
+    $py_content .= "        h_cov = cov_page.rect.height\n";
+    $py_content .= "        # Redact bottom-right corner to clear previous page numbers on cover\n";
+    $py_content .= "        cov_page.add_redact_annot(fitz.Rect(w_cov - 120, h_cov - 55, w_cov - 30, h_cov - 30))\n";
+    $py_content .= "        cov_page.apply_redactions()\n";
+    $py_content .= "        cov_page.insert_text((w_cov - 54 - 24, h_cov - 40), str(start_pg), fontsize=8, fontname=\"helv\", color=(0, 0, 0))\n";
+    $py_content .= "    \n";
     $py_content .= "    for i in range(1, total_pages):\n";
     $py_content .= "        page = doc[i]\n";
     $py_content .= "        width = page.rect.width\n";
@@ -232,6 +244,9 @@ function rjpes_pdf_merge($cover_pdf_path, $body_pdf_path, $output_pdf_path, $jou
     $py_content .= "        page.draw_line((54, 57), (width - 54, 57), color=(0, 0, 0), width=0.5)\n";
     $py_content .= "        footer_text = \"RESEARCH JOURNAL ON PHYSICAL EDUCATION AND SPORTS (RJPES)\"\n";
     $py_content .= "        page.insert_text((54, height - 40), footer_text, fontsize=8, fontname=\"helv\", color=(0, 0, 0))\n";
+    $py_content .= "        if start_pg is not None:\n";
+    $py_content .= "            pg_num_str = str(start_pg + i)\n";
+    $py_content .= "            page.insert_text((width - 54 - 24, height - 40), pg_num_str, fontsize=8, fontname=\"helv\", color=(0, 0, 0))\n";
     $py_content .= "    \n";
     $py_content .= "    # 3. Save the merged PDF (vector format)\n";
     $py_content .= "    doc.save(\"" . addslashes($out_abs) . "\", garbage=4, deflate=True, clean=True)\n";
@@ -370,7 +385,8 @@ function rjpes_regenerate_journal_pdf($journal_id) {
         'issue' => !empty($journal['issue']) ? $journal['issue'] : '1',
         'published_at' => !empty($journal['published_at']) ? $journal['published_at'] : date('Y-m-d H:i:s'),
         'author_photo' => $journal['author_photo'] ?? null,
-        'authors' => $authors
+        'authors' => $authors,
+        'start_page' => isset($journal['start_page']) && $journal['start_page'] !== null && $journal['start_page'] !== '' ? intval($journal['start_page']) : null
     ];
     
     require_once __DIR__ . '/pdf_helper.php';
@@ -405,7 +421,8 @@ function rjpes_regenerate_journal_pdf($journal_id) {
         $journal['journal_number'], 
         $journal_pdf_data['volume'], 
         $journal_pdf_data['issue'], 
-        $edition_month_year
+        $edition_month_year,
+        $journal_pdf_data['start_page']
     );
     
     // Clean up temp files
@@ -425,3 +442,78 @@ function rjpes_regenerate_journal_pdf($journal_id) {
     }
     return false;
 }
+
+/**
+ * Get page count of a PDF using PyMuPDF (fitz).
+ */
+function rjpes_pdf_get_page_count($pdf_path) {
+    $pdf_abs = realpath($pdf_path);
+    if (!$pdf_abs || !file_exists($pdf_abs)) {
+        return 0;
+    }
+    
+    $py_content = "import sys, fitz\n";
+    $py_content .= "try:\n";
+    $py_content .= "    doc = fitz.open(\"" . addslashes($pdf_abs) . "\")\n";
+    $py_content .= "    print(len(doc))\n";
+    $py_content .= "    doc.close()\n";
+    $py_content .= "except Exception as e:\n";
+    $py_content .= "    print(0)\n";
+    
+    $py_path = tempnam(sys_get_temp_dir(), 'rjpes_count_') . '.py';
+    file_put_contents($py_path, $py_content);
+    
+    $py_exe = (DIRECTORY_SEPARATOR === '\\') ? 'python' : 'python3';
+    $cmd_prefix = (DIRECTORY_SEPARATOR === '\\') ? '' : 'export HOME=/home/rjpes && export XDG_CACHE_HOME=/home/rjpes/.cache && ';
+    $cmd = $cmd_prefix . "$py_exe " . escapeshellarg($py_path) . " 2>&1";
+    $output = shell_exec($cmd);
+    @unlink($py_path);
+    
+    return intval(trim($output));
+}
+
+/**
+ * Compile multiple manuscript PDFs into a single book PDF.
+ */
+function rjpes_compile_book($pdf_paths, $output_pdf_path) {
+    // Ensure output directory exists
+    $pdf_dir = dirname($output_pdf_path);
+    if (!file_exists($pdf_dir)) {
+        mkdir($pdf_dir, 0777, true);
+    }
+    
+    // We will build a python script to merge them using fitz
+    $py_content = "import sys\n";
+    $py_content .= "import fitz\n";
+    $py_content .= "try:\n";
+    $py_content .= "    doc_compiled = fitz.open()\n";
+    foreach ($pdf_paths as $path) {
+        $abs_path = realpath($path);
+        if ($abs_path && file_exists($abs_path)) {
+            $py_content .= "    doc_indiv = fitz.open(\"" . addslashes($abs_path) . "\")\n";
+            $py_content .= "    doc_compiled.insert_pdf(doc_indiv)\n";
+            $py_content .= "    doc_indiv.close()\n";
+        }
+    }
+    $py_content .= "    doc_compiled.save(\"" . addslashes($output_pdf_path) . "\", garbage=4, deflate=True, clean=True)\n";
+    $py_content .= "    doc_compiled.close()\n";
+    $py_content .= "    print('success')\n";
+    $py_content .= "except Exception as e:\n";
+    $py_content .= "    print('error:', str(e))\n";
+    
+    $py_path = tempnam(sys_get_temp_dir(), 'rjpes_compile_') . '.py';
+    file_put_contents($py_path, $py_content);
+    
+    $py_exe = (DIRECTORY_SEPARATOR === '\\') ? 'python' : 'python3';
+    $cmd_prefix = (DIRECTORY_SEPARATOR === '\\') ? '' : 'export HOME=/home/rjpes && export XDG_CACHE_HOME=/home/rjpes/.cache && ';
+    $cmd = $cmd_prefix . "$py_exe " . escapeshellarg($py_path) . " 2>&1";
+    $output = shell_exec($cmd);
+    @unlink($py_path);
+    
+    if (strpos($output, 'success') === false) {
+        error_log("Book compilation failed: " . trim($output));
+        return false;
+    }
+    return file_exists($output_pdf_path) && filesize($output_pdf_path) > 0;
+}
+

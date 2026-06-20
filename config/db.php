@@ -47,6 +47,15 @@ try {
         } catch (PDOException $ex) {}
     }
 
+    // Auto-migration: Check and add start_page and end_page columns to journals table
+    try {
+        $pdo->query("SELECT start_page FROM journals LIMIT 1");
+    } catch (PDOException $e) {
+        try {
+            $pdo->exec("ALTER TABLE journals ADD COLUMN start_page INT DEFAULT NULL, ADD COLUMN end_page INT DEFAULT NULL");
+        } catch (PDOException $ex) {}
+    }
+
     // Auto-migration: Check and create journal_authors table
     try {
         $pdo->query("SELECT 1 FROM journal_authors LIMIT 1");

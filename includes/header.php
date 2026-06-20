@@ -70,6 +70,7 @@ $logged_user = get_logged_in_user();
                         <div class="dropdown-menu-content">
                             <?php if ($logged_user['role'] == 'admin'): ?>
                                 <a href="<?php echo $path_prefix; ?>admin/dashboard.php" class="<?php echo ($current_page == 'dashboard.php' && strpos($_SERVER['PHP_SELF'], '/admin/') !== false) ? 'active' : ''; ?>">Manage Submissions</a>
+                                <a href="<?php echo $path_prefix; ?>admin/compile.php" class="<?php echo ($current_page == 'compile.php') ? 'active' : ''; ?>">Book Compilations</a>
                                 <a href="<?php echo $path_prefix; ?>admin/authors.php" class="<?php echo ($current_page == 'authors.php') ? 'active' : ''; ?>">Manage Authors</a>
                                 <a href="<?php echo $path_prefix; ?>admin/verifiers.php" class="<?php echo ($current_page == 'verifiers.php') ? 'active' : ''; ?>">Manage Verifiers</a>
                                 <a href="<?php echo $path_prefix; ?>admin/admins.php" class="<?php echo ($current_page == 'admins.php') ? 'active' : ''; ?>">Manage Admins</a>

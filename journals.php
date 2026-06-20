@@ -356,6 +356,17 @@ function paginate_url($page, $domain, $q) {
                     <?php echo htmlspecialchars($grp['label']); ?>
                 </div>
                 <div class="vol-header-period"><?php echo htmlspecialchars($grp['period']); ?></div>
+                <?php 
+                $v_num = $grp['articles'][0]['volume'] ?? '';
+                $i_num = $grp['articles'][0]['issue'] ?? '';
+                $comp_file = "uploads/compilations/book_vol_" . preg_replace('/[^a-zA-Z0-9_-]/', '', $v_num) . "_issue_" . preg_replace('/[^a-zA-Z0-9_-]/', '', $i_num) . ".pdf";
+                $has_comp = !empty($v_num) && !empty($i_num) && file_exists(__DIR__ . '/' . $comp_file);
+                if ($has_comp):
+                ?>
+                <a href="<?php echo htmlspecialchars($comp_file); ?>" target="_blank" class="vol-header-period" style="background: #ecfdf5; color: #047857; text-decoration: none; border-left: 1px solid #a7f3d0; border-right: 1px solid #a7f3d0; transition: background 0.2s;" onmouseover="this.style.background='#d1fae5'" onmouseout="this.style.background='#ecfdf5'">
+                    📥 Download Full Issue Book (PDF)
+                </a>
+                <?php endif; ?>
                 <div class="vol-header-count"><?php echo $count; ?> article<?php echo $count !== 1 ? 's' : ''; ?></div>
                 <div class="vol-header-line"></div>
             </div>
@@ -405,6 +416,11 @@ function paginate_url($page, $domain, $q) {
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                                 <?php echo $period_j; ?>
                             </span>
+                            <?php if ($journal['start_page'] !== null && $journal['end_page'] !== null): ?>
+                            <span>
+                                📄 pp. <?php echo $journal['start_page']; ?> &ndash; <?php echo $journal['end_page']; ?>
+                            </span>
+                            <?php endif; ?>
                         </div>
 
                         <a href="/journal-detail.php?id=<?php echo $journal['id']; ?>" class="arc-btn">View Article →</a>

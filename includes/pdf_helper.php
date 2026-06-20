@@ -324,6 +324,7 @@ class RJPES_PDF {
         $volume = $journal['volume'] ?? '20';
         $issue = $journal['issue'] ?? '1';
         $pub_at = !empty($journal['published_at']) ? strtotime($journal['published_at']) : time();
+        $start_page = isset($journal['start_page']) && $journal['start_page'] !== null && $journal['start_page'] !== '' ? intval($journal['start_page']) : null;
         $date = date('d F Y', $pub_at);
         $month_year = date('F Y', $pub_at);
         
@@ -577,6 +578,13 @@ class RJPES_PDF {
         $content_stream .= "54 40 Td (" . $this->escape_text("RESEARCH JOURNAL ON PHYSICAL EDUCATION AND SPORTS (RJPES)") . ") Tj\n";
         $content_stream .= "ET\n";
         
+        if ($start_page !== null) {
+            $content_stream .= "BT\n";
+            $content_stream .= "/F1 8 Tf\n";
+            $content_stream .= "520 40 Td (" . $start_page . ") Tj\n";
+            $content_stream .= "ET\n";
+        }
+        
         // Full Text Content
         if (!empty($content)) {
             // First page is complete with the cover page details and signature
@@ -611,6 +619,11 @@ class RJPES_PDF {
                     $current_page_str .= "54 40 Td (" . $this->escape_text("RESEARCH JOURNAL ON PHYSICAL EDUCATION AND SPORTS (RJPES)") . ") Tj\n";
                     $current_page_str .= "ET\n";
                     
+                    if ($start_page !== null) {
+                        $actual_pg = $start_page + $page_num - 1;
+                        $current_page_str .= "BT\n/F1 8 Tf\n520 40 Td (" . $actual_pg . ") Tj\nET\n";
+                    }
+                    
                     $pages_content[] = $current_page_str;
                     $page_num++;
                     
@@ -642,6 +655,11 @@ class RJPES_PDF {
             $current_page_str .= "/F1 8 Tf\n";
             $current_page_str .= "54 40 Td (" . $this->escape_text("RESEARCH JOURNAL ON PHYSICAL EDUCATION AND SPORTS (RJPES)") . ") Tj\n";
             $current_page_str .= "ET\n";
+            
+            if ($start_page !== null) {
+                $actual_pg = $start_page + $page_num - 1;
+                $current_page_str .= "BT\n/F1 8 Tf\n520 40 Td (" . $actual_pg . ") Tj\nET\n";
+            }
             
             $pages_content[] = $current_page_str;
         } else {
