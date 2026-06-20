@@ -219,10 +219,8 @@ function rjpes_pdf_merge($cover_pdf_path, $body_pdf_path, $output_pdf_path, $jou
     $py_content .= "        header_text = \"RJPES | Vol. " . addslashes($volume) . ", Issue " . addslashes($issue) . " (" . addslashes($month_year) . ") | Journal No: " . addslashes($journal_number) . "\"\n";
     $py_content .= "        page.insert_text((54, 50), header_text, fontsize=9, fontname=\"helv\", color=(0, 0, 0))\n";
     $py_content .= "        page.draw_line((54, 57), (width - 54, 57), color=(0, 0, 0), width=0.5)\n";
-    $py_content .= "        footer_text = \"RJPES Journal Portal | Official Publication of ACTPE, Calicut University\"\n";
+    $py_content .= "        footer_text = \"RESEARCH JOURNAL ON PHYSICAL EDUCATION AND SPORTS (RJPES)\"\n";
     $py_content .= "        page.insert_text((54, height - 40), footer_text, fontsize=8, fontname=\"helv\", color=(0, 0, 0))\n";
-    $py_content .= "        page_text = f\"Page {i + 1}\"\n";
-    $py_content .= "        page.insert_text((width - 95, height - 40), page_text, fontsize=8, fontname=\"helv\", color=(0, 0, 0))\n";
     $py_content .= "    \n";
     $py_content .= "    # 3. Save the merged PDF (vector format)\n";
     $py_content .= "    doc.save(\"" . addslashes($out_abs) . "\", garbage=4, deflate=True, clean=True)\n";

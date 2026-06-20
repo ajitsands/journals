@@ -276,7 +276,7 @@ class RJPES_PDF {
         
         $content_stream .= "BT\n";
         $content_stream .= "/F1 9 Tf\n"; // Regular Font
-        $content_stream .= "54 754 Td (" . $this->escape_text("ISSN: 0975-4687 | Volume " . $volume . ", Issue " . $issue . " (" . $month_year . ") | UGC Guidelines Followed") . ") Tj\n";
+        $content_stream .= "54 754 Td (" . $this->escape_text("ISSN: 0975-4687 | Volume " . $volume . ", Issue " . $issue . " (" . $month_year . ") | Peer-Reviewed") . ") Tj\n";
         $content_stream .= "ET\n";
         
         $content_stream .= "BT\n";
@@ -481,12 +481,7 @@ class RJPES_PDF {
         // Add footer to first page
         $content_stream .= "BT\n";
         $content_stream .= "/F1 8 Tf\n";
-        $content_stream .= "54 40 Td (" . $this->escape_text("RJPES Journal Portal | Official Publication of ACTPE, Calicut University") . ") Tj\n";
-        $content_stream .= "ET\n";
-        
-        $content_stream .= "BT\n";
-        $content_stream .= "/F1 8 Tf\n";
-        $content_stream .= "500 40 Td (" . $this->escape_text("Page 1") . ") Tj\n";
+        $content_stream .= "54 40 Td (" . $this->escape_text("RESEARCH JOURNAL ON PHYSICAL EDUCATION AND SPORTS (RJPES)") . ") Tj\n";
         $content_stream .= "ET\n";
         
         // Full Text Content
@@ -520,13 +515,7 @@ class RJPES_PDF {
                     // Add footer to current page
                     $current_page_str .= "BT\n";
                     $current_page_str .= "/F1 8 Tf\n";
-                    $current_page_str .= "54 40 Td (" . $this->escape_text("RJPES Journal Portal | Official Publication of ACTPE, Calicut University") . ") Tj\n";
-                    $current_page_str .= "ET\n";
-                    
-                    // Page number
-                    $current_page_str .= "BT\n";
-                    $current_page_str .= "/F1 8 Tf\n";
-                    $current_page_str .= "500 40 Td (" . $this->escape_text("Page " . $page_num) . ") Tj\n";
+                    $current_page_str .= "54 40 Td (" . $this->escape_text("RESEARCH JOURNAL ON PHYSICAL EDUCATION AND SPORTS (RJPES)") . ") Tj\n";
                     $current_page_str .= "ET\n";
                     
                     $pages_content[] = $current_page_str;
@@ -558,13 +547,7 @@ class RJPES_PDF {
             // Add footer to final page
             $current_page_str .= "BT\n";
             $current_page_str .= "/F1 8 Tf\n";
-            $current_page_str .= "54 40 Td (" . $this->escape_text("RJPES Journal Portal | Official Publication of ACTPE, Calicut University") . ") Tj\n";
-            $current_page_str .= "ET\n";
-            
-            // Page number
-            $current_page_str .= "BT\n";
-            $current_page_str .= "/F1 8 Tf\n";
-            $current_page_str .= "500 40 Td (" . $this->escape_text("Page " . $page_num) . ") Tj\n";
+            $current_page_str .= "54 40 Td (" . $this->escape_text("RESEARCH JOURNAL ON PHYSICAL EDUCATION AND SPORTS (RJPES)") . ") Tj\n";
             $current_page_str .= "ET\n";
             
             $pages_content[] = $current_page_str;
@@ -719,7 +702,7 @@ class RJPES_PDF {
         $content_stream .= "BT\n";
         $content_stream .= "0.3 g\n"; // Dark Gray text
         $content_stream .= "/F1 9 Tf\n"; // Regular Font
-        $content_stream .= "54 756 Td (" . $this->escape_text("ISSN: 0975-4687 (Online) | UGC Guidelines Followed | Ref. No: RJPES/AL") . ") Tj\n";
+        $content_stream .= "54 756 Td (" . $this->escape_text("ISSN: 0975-4687 (Online) | Peer-Reviewed | Ref. No: RJPES/AL") . ") Tj\n";
         $content_stream .= "ET\n";
         
         $content_stream .= "BT\n";
@@ -1150,7 +1133,7 @@ class RJPES_PDF {
         $content_stream .= "BT\n";
         $content_stream .= "0.3 g\n";
         $content_stream .= "/F1 8.5 Tf\n";
-        $content_stream .= "54 744 Td (" . $this->escape_text("ISSN: 0975-4687 (Online) | UGC Guidelines Followed | Official Journal Portal") . ") Tj\n";
+        $content_stream .= "54 744 Td (" . $this->escape_text("ISSN: 0975-4687 (Online) | Peer-Reviewed | Official Journal Portal") . ") Tj\n";
         $content_stream .= "ET\n";
         
         $content_stream .= "BT\n";
