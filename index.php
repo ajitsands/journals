@@ -46,7 +46,6 @@ try {
 <!-- Hero Header -->
 <section class="hero">
     <div class="hero-content">
-        <span class="hero-tag">VOLUME <?php echo sanitize($latest_vol); ?> • ISSUE <?php echo sanitize($latest_iss); ?> • <?php echo sanitize($latest_date); ?></span>
         <h1>Research Journal on Physical Education & Sports (RJPES)</h1>
         <p style="font-size: 1.2rem; font-weight: 400; line-height: 1.6; max-width: 700px; margin: 0 auto 2.5rem;">
             Voice of Sports - Association of College Teachers in Physical Education (ACTPE), University of Calicut
@@ -156,11 +155,11 @@ try {
         <div>
             <div class="card">
                 <h2 class="card-title" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-                    <span>📚 Call For Papers (Volume <?php echo sanitize($latest_vol); ?>, Issue <?php echo sanitize($latest_iss); ?>)</span>
+                    <span>📚 Call For Papers</span>
                     <span class="badge-active">Open</span>
                 </h2>
                 <p style="margin-bottom: 1.5rem;">
-                    The Editorial Board of the <strong>Research Journal on Physical Education and Sports (RJPES)</strong> invites researchers, scholars, academicians, and sports professionals to submit their original research articles, review papers, and short communications for publication in our upcoming <?php echo sanitize($latest_month_year); ?> issue.
+                    The Editorial Board of the <strong>Research Journal on Physical Education and Sports (RJPES)</strong> invites researchers, scholars, academicians, and sports professionals to submit their original research articles, review papers, and short communications for publication.
                 </p>
                 
                 <div class="journal-details-grid" style="margin-bottom: 1rem;">
