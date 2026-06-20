@@ -174,16 +174,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($upload_ok && ($regenerate_pdf || !$is_edit)) {
             require_once __DIR__ . '/../includes/pdf_helper.php';
             
-            // Determine volume and issue for header/footer
+            // Determine volume, issue, and edition date for header/footer
             $latest_vol = '20';
             $latest_iss = '1';
+            $latest_date = date('Y-m-d');
             try {
-                $set_stmt = $pdo->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('current_volume', 'current_issue')");
+                $set_stmt = $pdo->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('current_volume', 'current_issue', 'current_edition_date')");
                 while ($row = $set_stmt->fetch()) {
                     if ($row['setting_key'] === 'current_volume') $latest_vol = $row['setting_value'];
                     if ($row['setting_key'] === 'current_issue') $latest_iss = $row['setting_value'];
+                    if ($row['setting_key'] === 'current_edition_date') $latest_date = $row['setting_value'];
                 }
             } catch (PDOException $e) {}
+            
+            $edition_month_year = date('F Y', strtotime($latest_date));
             
             // Build temporary authors list to pass to cover PDF generator
             $temp_authors = [];
@@ -247,7 +251,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'content' => '', // MUST BE EMPTY for cover page only
                 'volume' => $latest_vol,
                 'issue' => $latest_iss,
-                'published_at' => date('Y-m-d H:i:s'),
+                'published_at' => date('Y-m-d H:i:s', strtotime($latest_date)),
                 'author_photo' => $author_photo_path,
                 'authors' => $temp_authors
             ];
@@ -303,7 +307,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 $merge_success = false;
                 if (!empty($body_pdf_path) && file_exists($body_pdf_path)) {
-                    $merge_success = rjpes_pdf_merge($cover_pdf_path, $body_pdf_path, $final_pdf_dest_path, $journal_number, $latest_vol, $latest_iss, date('F Y'));
+                    $merge_success = rjpes_pdf_merge($cover_pdf_path, $body_pdf_path, $final_pdf_dest_path, $journal_number, $latest_vol, $latest_iss, $edition_month_year);
                 } else {
                     $merge_success = copy($cover_pdf_path, $final_pdf_dest_path);
                 }

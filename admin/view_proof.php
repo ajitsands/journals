@@ -20,6 +20,11 @@ try {
     if (!$payment) {
         die("Payment record not found for this manuscript.");
     }
+    
+    // Fetch active settings for the publish modal
+    $current_vol = rjpes_get_setting('current_volume', '20');
+    $current_issue = rjpes_get_setting('current_issue', '1');
+    $current_edition_date = rjpes_get_setting('current_edition_date', date('Y-m-d'));
 } catch (PDOException $e) {
     die("Database error: " . $e->getMessage());
 }
@@ -116,17 +121,22 @@ require_once __DIR__ . '/../includes/header.php';
             <input type="hidden" name="journal_id" id="publishJournalId">
             
             <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.5rem;">
-                Set publication Volume and Issue number for manuscript <strong id="publishJournalNo"></strong>. Confirming this action marks payment verified and displays the journal in public listings.
+                Set publication Volume, Issue number and Publication Date for manuscript <strong id="publishJournalNo"></strong>. Confirming this action marks payment verified and displays the journal in public listings.
             </p>
             
             <div class="form-group">
                 <label for="volume">Volume (e.g., 20)</label>
-                <input type="text" name="volume" id="volume" class="form-control" value="20" required>
+                <input type="text" name="volume" id="volume" class="form-control" value="<?php echo htmlspecialchars($current_vol); ?>" required>
             </div>
             
             <div class="form-group">
                 <label for="issue">Issue (e.g., 1)</label>
-                <input type="text" name="issue" id="issue" class="form-control" value="1" required>
+                <input type="text" name="issue" id="issue" class="form-control" value="<?php echo htmlspecialchars($current_issue); ?>" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="publication_date">Publication Date</label>
+                <input type="date" name="publication_date" id="publication_date" class="form-control" value="<?php echo htmlspecialchars($current_edition_date); ?>" required>
             </div>
             
             <div style="margin-top: 1.5rem; display: flex; gap: 10px; justify-content: flex-end;">
@@ -141,6 +151,12 @@ require_once __DIR__ . '/../includes/header.php';
 function openPublishModal(journalId, journalNo) {
     document.getElementById('publishJournalId').value = journalId;
     document.getElementById('publishJournalNo').textContent = journalNo;
+    
+    // Set default volume, issue, and date from the active settings in DB
+    document.getElementById('volume').value = "<?php echo addslashes($current_vol); ?>";
+    document.getElementById('issue').value = "<?php echo addslashes($current_issue); ?>";
+    document.getElementById('publication_date').value = "<?php echo addslashes($current_edition_date); ?>";
+    
     document.getElementById('publishModal').style.display = 'flex';
 }
 function closePublishModal() {

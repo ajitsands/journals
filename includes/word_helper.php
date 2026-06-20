@@ -216,6 +216,17 @@ function rjpes_pdf_merge($cover_pdf_path, $body_pdf_path, $output_pdf_path, $jou
     $py_content .= "        page = doc[i]\n";
     $py_content .= "        width = page.rect.width\n";
     $py_content .= "        height = page.rect.height\n";
+    $py_content .= "        # Clean up existing RJPES headers/footers if present to avoid overlap\n";
+    $py_content .= "        has_hdr = False\n";
+    $py_content .= "        for inst in page.search_for(\"RJPES\"):\n";
+    $py_content .= "            if inst.y0 < 100:\n";
+    $py_content .= "                has_hdr = True\n";
+    $py_content .= "                break\n";
+    $py_content .= "        if has_hdr:\n";
+    $py_content .= "            page.add_redact_annot(fitz.Rect(0, 30, width, 65))\n";
+    $py_content .= "            page.add_redact_annot(fitz.Rect(0, height - 55, width, height))\n";
+    $py_content .= "            page.apply_redactions()\n";
+    $py_content .= "        \n";
     $py_content .= "        header_text = \"RJPES | Vol. " . addslashes($volume) . ", Issue " . addslashes($issue) . " (" . addslashes($month_year) . ") | Journal No: " . addslashes($journal_number) . "\"\n";
     $py_content .= "        page.insert_text((54, 50), header_text, fontsize=9, fontname=\"helv\", color=(0, 0, 0))\n";
     $py_content .= "        page.draw_line((54, 57), (width - 54, 57), color=(0, 0, 0), width=0.5)\n";
@@ -310,3 +321,107 @@ function rjpes_pdf_extract_body($merged_pdf_path, $output_body_path) {
     return file_exists($out_abs) && filesize($out_abs) > 0;
 }
 
+/**
+ * Regenerate and re-merge a journal's PDF using its current database metadata
+ * (volume, issue, and published_at date).
+ * This is useful if the admin changes the publication details or if they were 
+ * originally submitted under a different set of edition settings.
+ */
+function rjpes_regenerate_journal_pdf($journal_id) {
+    global $pdo;
+    require_once __DIR__ . '/auth.php';
+    
+    // Fetch journal details
+    $stmt = $pdo->prepare("SELECT j.*, u.fullname AS author_name, u.email AS author_email FROM journals j JOIN users u ON j.author_id = u.id WHERE j.id = ?");
+    $stmt->execute([$journal_id]);
+    $journal = $stmt->fetch();
+    if (!$journal) return false;
+    
+    $manuscript_file = $journal['manuscript_file'];
+    if (empty($manuscript_file)) return false;
+    
+    $pdf_path = __DIR__ . '/../' . $manuscript_file;
+    if (!file_exists($pdf_path)) return false;
+    
+    // We also need the authors list
+    $auth_stmt = $pdo->prepare("SELECT * FROM journal_authors WHERE journal_id = ? ORDER BY order_num ASC");
+    $auth_stmt->execute([$journal_id]);
+    $authors = $auth_stmt->fetchAll();
+    
+    // If authors list is empty, default to primary author
+    if (empty($authors)) {
+        $authors = [[
+            'name' => $journal['author_name'] ?? '',
+            'photo_path' => $journal['author_photo'] ?? null,
+            'order_num' => 1
+        ]];
+    }
+    
+    // Prepare data for the PDF cover page generator
+    $journal_pdf_data = [
+        'id' => $journal['id'],
+        'title' => $journal['title'],
+        'author_name' => $journal['author_name'] ?? '',
+        'subject_domain' => $journal['subject_domain'],
+        'journal_number' => $journal['journal_number'],
+        'abstract' => $journal['abstract'],
+        'content' => '', // MUST BE EMPTY for cover page only
+        'volume' => !empty($journal['volume']) ? $journal['volume'] : '20',
+        'issue' => !empty($journal['issue']) ? $journal['issue'] : '1',
+        'published_at' => !empty($journal['published_at']) ? $journal['published_at'] : date('Y-m-d H:i:s'),
+        'author_photo' => $journal['author_photo'] ?? null,
+        'authors' => $authors
+    ];
+    
+    require_once __DIR__ . '/pdf_helper.php';
+    
+    // 1. Generate new Cover Page PDF
+    $pdf_generator = new RJPES_PDF();
+    $cover_bytes = $pdf_generator->generate($journal_pdf_data);
+    
+    $upload_dir = __DIR__ . '/../uploads/';
+    $cover_temp = $upload_dir . 'cover_temp_regen_' . time() . '_' . rand(1000, 9999) . '.pdf';
+    file_put_contents($cover_temp, $cover_bytes);
+    
+    // 2. Extract Body PDF from the existing merged PDF
+    $body_temp = $upload_dir . 'body_temp_regen_' . time() . '_' . rand(1000, 9999) . '.pdf';
+    $ext_success = rjpes_pdf_extract_body($pdf_path, $body_temp);
+    
+    if (!$ext_success) {
+        @unlink($cover_temp);
+        return false;
+    }
+    
+    // Determine the edition month/year to draw in the running header/footer
+    $pub_time = !empty($journal['published_at']) ? strtotime($journal['published_at']) : time();
+    $edition_month_year = date('F Y', $pub_time);
+    
+    // 3. Merge the new cover and the extracted body
+    $final_temp = $upload_dir . 'final_temp_regen_' . time() . '_' . rand(1000, 9999) . '.pdf';
+    $merge_success = rjpes_pdf_merge(
+        $cover_temp, 
+        $body_temp, 
+        $final_temp, 
+        $journal['journal_number'], 
+        $journal_pdf_data['volume'], 
+        $journal_pdf_data['issue'], 
+        $edition_month_year
+    );
+    
+    // Clean up temp files
+    @unlink($cover_temp);
+    @unlink($body_temp);
+    
+    if ($merge_success && file_exists($final_temp) && filesize($final_temp) > 0) {
+        // Overwrite the original PDF file with the new regenerated one
+        @unlink($pdf_path);
+        $ok = copy($final_temp, $pdf_path);
+        @unlink($final_temp);
+        return $ok;
+    }
+    
+    if (file_exists($final_temp)) {
+        @unlink($final_temp);
+    }
+    return false;
+}

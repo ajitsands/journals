@@ -236,6 +236,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['publish_journal'])) {
             $upd_journ = $pdo->prepare("UPDATE journals SET status = 'published', volume = ?, issue = ?, published_at = ? WHERE id = ?");
             $upd_journ->execute([$volume, $issue, $pub_at, $journal_id]);
             
+            // Regenerate the PDF cover and headers/footers with the new volume, issue, and publication date
+            try {
+                require_once __DIR__ . '/../includes/word_helper.php';
+                rjpes_regenerate_journal_pdf($journal_id);
+            } catch (Exception $pdf_ex) {
+                // Keep the database update even if PDF regeneration has minor issues, but log it
+                error_log("Failed to regenerate PDF on publish for journal $journal_id: " . $pdf_ex->getMessage());
+            }
+            
             // Record Wallet Ledger Transactions
             // A. Get the assigned verifier (reviewer) who reviewed the paper
             $stmt_rev = $pdo->prepare("SELECT reviewer_id FROM reviewer_assignments WHERE journal_id = ? AND status = 'reviewed' ORDER BY assigned_at DESC LIMIT 1");
@@ -325,6 +334,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_publication'])) 
         try {
             $upd_journ = $pdo->prepare("UPDATE journals SET volume = ?, issue = ?, published_at = ? WHERE id = ? AND status = 'published'");
             $upd_journ->execute([$volume, $issue, $publication_date, $journal_id]);
+            
+            // Regenerate the PDF cover and headers/footers with the updated volume, issue, and publication date
+            try {
+                require_once __DIR__ . '/../includes/word_helper.php';
+                rjpes_regenerate_journal_pdf($journal_id);
+            } catch (Exception $pdf_ex) {
+                error_log("Failed to regenerate PDF on edit publication for journal $journal_id: " . $pdf_ex->getMessage());
+            }
+            
             $message = "Publication info updated successfully. Journal is now listed as Vol. $volume, Issue $issue.";
             $message_type = "success";
         } catch (PDOException $e) {
@@ -340,6 +358,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_publication'])) 
 // Fetch admin dashboard stats
 try {
     $current_vol = rjpes_get_setting('current_volume', '20');
+    $current_issue = rjpes_get_setting('current_issue', '1');
+    $current_edition_date = rjpes_get_setting('current_edition_date', date('Y-m-d'));
     
     // Submissions for the current Volume
     $stmt_vol = $pdo->prepare("SELECT COUNT(*) FROM journals WHERE volume = ?");
@@ -853,17 +873,17 @@ require_once __DIR__ . '/../includes/header.php';
             
             <div class="form-group">
                 <label for="volume">Volume (e.g., 20)</label>
-                <input type="text" name="volume" id="volume" class="form-control" value="20" required>
+                <input type="text" name="volume" id="volume" class="form-control" value="<?php echo htmlspecialchars($current_vol); ?>" required>
             </div>
             
             <div class="form-group">
                 <label for="issue">Issue (e.g., 1)</label>
-                <input type="text" name="issue" id="issue" class="form-control" value="1" required>
+                <input type="text" name="issue" id="issue" class="form-control" value="<?php echo htmlspecialchars($current_issue); ?>" required>
             </div>
 
             <div class="form-group">
                 <label for="publication_date">Publication Date</label>
-                <input type="date" name="publication_date" id="publication_date" class="form-control" required>
+                <input type="date" name="publication_date" id="publication_date" class="form-control" value="<?php echo htmlspecialchars($current_edition_date); ?>" required>
             </div>
             
             <div style="margin-top: 1.5rem; display: flex; gap: 10px; justify-content: flex-end;">
@@ -1032,11 +1052,10 @@ function openPublishModal(journalId, journalNo) {
     document.getElementById('publishJournalId').value = journalId;
     document.getElementById('publishJournalNo').textContent = journalNo;
     
-    // Set default date to today's local date in YYYY-MM-DD format
-    var today = new Date();
-    var offset = today.getTimezoneOffset();
-    today = new Date(today.getTime() - (offset*60*1000));
-    document.getElementById('publication_date').value = today.toISOString().split('T')[0];
+    // Set default volume, issue, and date from the active settings in DB
+    document.getElementById('volume').value = "<?php echo addslashes($current_vol); ?>";
+    document.getElementById('issue').value = "<?php echo addslashes($current_issue); ?>";
+    document.getElementById('publication_date').value = "<?php echo addslashes($current_edition_date); ?>";
     
     document.getElementById('publishModal').style.display = 'flex';
 }
