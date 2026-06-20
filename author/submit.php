@@ -591,7 +591,7 @@ require_once __DIR__ . '/../includes/header.php';
 
                 <div class="form-group">
                     <label for="abstract">Abstract</label>
-                    <textarea name="abstract" id="abstract" class="form-control" rows="8" placeholder="Provide a concise abstract of your paper (around 150-250 words) outlining background, methods, results, and conclusion." required><?php echo $is_edit ? sanitize($edit_journal['abstract']) : ''; ?></textarea>
+                    <textarea name="abstract" id="abstract" class="form-control" rows="8" placeholder="Provide a concise abstract of your paper (around 150-250 words) outlining background, methods, results, and conclusion."><?php echo $is_edit ? sanitize($edit_journal['abstract']) : ''; ?></textarea>
                 </div>
 
                 <div class="form-group" style="display: none;">
@@ -691,9 +691,17 @@ require_once __DIR__ . '/../includes/header.php';
 
     const abstractTextarea = document.querySelector('#abstract');
     if (abstractTextarea && abstractTextarea.form) {
-        abstractTextarea.form.addEventListener('submit', function() {
+        abstractTextarea.form.addEventListener('submit', function(e) {
             if (abstractEditorInstance) {
-                abstractTextarea.value = abstractEditorInstance.getData();
+                const data = abstractEditorInstance.getData();
+                abstractTextarea.value = data;
+                
+                // Strip HTML tags to check if there is actual text content entered
+                const plainText = data.replace(/<[^>]*>/g, '').trim();
+                if (plainText === '') {
+                    alert("Please fill in the Abstract field.");
+                    e.preventDefault();
+                }
             }
         });
     }
