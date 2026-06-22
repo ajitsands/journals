@@ -61,8 +61,8 @@ try {
 
     // ── Authorization ─────────────────────────────────────────────────────────
     $is_authorized = false;
-    if ($type === 'invoice') {
-        // Strict: only author and admins can download invoice
+    if ($type === 'invoice' || $type === 'acceptance') {
+        // Strict: only author and admins can download invoice or acceptance letter
         if (is_logged_in()) {
             $user = get_logged_in_user();
             if ($user['role'] === 'admin' || $user['id'] == $journal['author_id']) {

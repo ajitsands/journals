@@ -87,69 +87,87 @@ require_once __DIR__ . '/includes/header.php';
             </div>
             
             <?php if ($journal['status'] === 'published'): ?>
-                <!-- Download Split Dropdown -->
-                <div style="position: relative; display: inline-flex; vertical-align: middle;" id="dlDropWrap">
-                    <button onclick="toggleDlDrop()" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; background: var(--primary-color); color: white; border: none; border-radius: 8px 0 0 8px; font-weight: 600; font-size: 0.9rem; cursor: pointer; font-family: var(--font-body);">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                        Download
-                    </button>
-                    <button onclick="toggleDlDrop()" style="display: inline-flex; align-items: center; padding: 10px 12px; background: #16365f; color: white; border: none; border-left: 1px solid rgba(255,255,255,0.2); border-radius: 0 8px 8px 0; cursor: pointer;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-                    </button>
-                    <!-- Dropdown Menu -->
-                    <div id="dlDropMenu" style="display:none; position: absolute; right: 0; top: calc(100% + 6px); background: white; border: 1px solid var(--border-color); border-radius: 10px; box-shadow: var(--shadow-lg); min-width: 240px; z-index: 999; overflow: hidden;">
-                        <a href="/download.php?id=<?php echo $journal['id']; ?>&type=acceptance"
-                           style="display: flex; align-items: center; gap: 12px; padding: 14px 18px; text-decoration: none; color: var(--text-color); font-size: 0.88rem; font-weight: 500; border-bottom: 1px solid var(--border-color); transition: background 0.15s;"
-                           onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
-                            <span style="width:36px; height:36px; background: #fffbeb; border-radius: 8px; display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0;">📨</span>
-                            <div>
-                                <div style="font-weight: 600; color: var(--primary-color);">Acceptance Letter</div>
-                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Official RJPES acceptance letter</div>
-                            </div>
-                        </a>
-                        <a href="/download.php?id=<?php echo $journal['id']; ?>&type=article"
-                           style="display: flex; align-items: center; gap: 12px; padding: 14px 18px; text-decoration: none; color: var(--text-color); font-size: 0.88rem; font-weight: 500; border-bottom: 1px solid var(--border-color); transition: background 0.15s;"
-                           onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
-                            <span style="width:36px; height:36px; background: #eff6ff; border-radius: 8px; display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0;">📄</span>
-                            <div>
-                                <div style="font-weight: 600; color: var(--primary-color);">Article / Manuscript</div>
-                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Latest submitted manuscript file</div>
-                            </div>
-                        </a>
-                        <?php 
-                        $show_invoice = false;
-                        if (!empty($journal['bill_number']) && is_logged_in()) {
-                            $user = get_logged_in_user();
-                            if ($user['role'] === 'admin' || $user['id'] == $journal['author_id']) {
-                                $show_invoice = true;
-                            }
-                        }
-                        if ($show_invoice): 
-                        ?>
-                        <a href="/download.php?id=<?php echo $journal['id']; ?>&type=invoice"
-                           style="display: flex; align-items: center; gap: 12px; padding: 14px 18px; text-decoration: none; color: var(--text-color); font-size: 0.88rem; font-weight: 500; transition: background 0.15s;"
-                           onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
-                            <span style="width:36px; height:36px; background: #ecfdf5; border-radius: 8px; display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0;">🧾</span>
-                            <div>
-                                <div style="font-weight: 600; color: #047857;">GST Tax Invoice</div>
-                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Download GST invoice bill</div>
-                            </div>
-                        </a>
-                        <?php endif; ?>
-                    </div>
-                </div>
-                <script>
-                function toggleDlDrop() {
-                    var m = document.getElementById('dlDropMenu');
-                    m.style.display = m.style.display === 'none' ? 'block' : 'none';
-                }
-                // Close on outside click
-                document.addEventListener('click', function(e) {
-                    if (!document.getElementById('dlDropWrap').contains(e.target)) {
-                        document.getElementById('dlDropMenu').style.display = 'none';
+                <?php 
+                $show_full_dropdown = false;
+                if (is_logged_in()) {
+                    $user = get_logged_in_user();
+                    if ($user['role'] === 'admin' || $user['id'] == $journal['author_id']) {
+                        $show_full_dropdown = true;
                     }
-                });
-                </script>
+                }
+                ?>
+                <?php if ($show_full_dropdown): ?>
+                    <!-- Download Split Dropdown -->
+                    <div style="position: relative; display: inline-flex; vertical-align: middle;" id="dlDropWrap">
+                        <button onclick="toggleDlDrop()" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; background: var(--primary-color); color: white; border: none; border-radius: 8px 0 0 8px; font-weight: 600; font-size: 0.9rem; cursor: pointer; font-family: var(--font-body);">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            Download
+                        </button>
+                        <button onclick="toggleDlDrop()" style="display: inline-flex; align-items: center; padding: 10px 12px; background: #16365f; color: white; border: none; border-left: 1px solid rgba(255,255,255,0.2); border-radius: 0 8px 8px 0; cursor: pointer;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        <!-- Dropdown Menu -->
+                        <div id="dlDropMenu" style="display:none; position: absolute; right: 0; top: calc(100% + 6px); background: white; border: 1px solid var(--border-color); border-radius: 10px; box-shadow: var(--shadow-lg); min-width: 240px; z-index: 999; overflow: hidden;">
+                            <a href="/download.php?id=<?php echo $journal['id']; ?>&type=acceptance"
+                               style="display: flex; align-items: center; gap: 12px; padding: 14px 18px; text-decoration: none; color: var(--text-color); font-size: 0.88rem; font-weight: 500; border-bottom: 1px solid var(--border-color); transition: background 0.15s;"
+                               onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+                                <span style="width:36px; height:36px; background: #fffbeb; border-radius: 8px; display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0;">📨</span>
+                                <div>
+                                    <div style="font-weight: 600; color: var(--primary-color);">Acceptance Letter</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Official RJPES acceptance letter</div>
+                                </div>
+                            </a>
+                            <a href="/download.php?id=<?php echo $journal['id']; ?>&type=article"
+                               style="display: flex; align-items: center; gap: 12px; padding: 14px 18px; text-decoration: none; color: var(--text-color); font-size: 0.88rem; font-weight: 500; border-bottom: 1px solid var(--border-color); transition: background 0.15s;"
+                               onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+                                <span style="width:36px; height:36px; background: #eff6ff; border-radius: 8px; display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0;">📄</span>
+                                <div>
+                                    <div style="font-weight: 600; color: var(--primary-color);">Article / Manuscript</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Latest submitted manuscript file</div>
+                                </div>
+                            </a>
+                            <?php 
+                            $show_invoice = false;
+                            if (!empty($journal['bill_number']) && is_logged_in()) {
+                                $user = get_logged_in_user();
+                                if ($user['role'] === 'admin' || $user['id'] == $journal['author_id']) {
+                                    $show_invoice = true;
+                                }
+                            }
+                            if ($show_invoice): 
+                            ?>
+                            <a href="/download.php?id=<?php echo $journal['id']; ?>&type=invoice"
+                               style="display: flex; align-items: center; gap: 12px; padding: 14px 18px; text-decoration: none; color: var(--text-color); font-size: 0.88rem; font-weight: 500; transition: background 0.15s;"
+                               onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+                                <span style="width:36px; height:36px; background: #ecfdf5; border-radius: 8px; display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0;">🧾</span>
+                                <div>
+                                    <div style="font-weight: 600; color: #047857;">GST Tax Invoice</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Download GST invoice bill</div>
+                                </div>
+                            </a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <script>
+                    function toggleDlDrop() {
+                        var m = document.getElementById('dlDropMenu');
+                        m.style.display = m.style.display === 'none' ? 'block' : 'none';
+                    }
+                    // Close on outside click
+                    document.addEventListener('click', function(e) {
+                        if (!document.getElementById('dlDropWrap').contains(e.target)) {
+                            document.getElementById('dlDropMenu').style.display = 'none';
+                        }
+                    });
+                    </script>
+                <?php else: ?>
+                    <!-- Single Download Button for General Public -->
+                    <a href="/download.php?id=<?php echo $journal['id']; ?>&type=article" 
+                       style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; background: var(--primary-color); color: white; border: none; border-radius: 8px; font-weight: 600; font-size: 0.9rem; text-decoration: none; cursor: pointer; font-family: var(--font-body);">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Download Article
+                    </a>
+                <?php endif; ?>
             <?php else: ?>
                 <div style="background-color: var(--warning-color); color: #856404; padding: 6px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: 600;">
                     Preview Mode (Not Published)
