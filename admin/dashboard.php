@@ -355,6 +355,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_publication'])) 
     }
 }
 
+// 5. Handle Edit Submission Date
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_submission_date'])) {
+    $journal_id = intval($_POST['journal_id']);
+    $submission_date = sanitize($_POST['submission_date'] ?? '');
+
+    if ($journal_id > 0 && !empty($submission_date)) {
+        try {
+            $formatted_date = date('Y-m-d H:i:s', strtotime($submission_date));
+            $upd_journ = $pdo->prepare("UPDATE journals SET created_at = ? WHERE id = ?");
+            $upd_journ->execute([$formatted_date, $journal_id]);
+            
+            // Regenerate PDF cover/metadata
+            try {
+                require_once __DIR__ . '/../includes/word_helper.php';
+                rjpes_regenerate_journal_pdf($journal_id);
+            } catch (Exception $pdf_ex) {
+                error_log("Failed to regenerate PDF on edit submission date for journal $journal_id: " . $pdf_ex->getMessage());
+            }
+            
+            $message = "Submission date updated successfully.";
+            $message_type = "success";
+        } catch (PDOException $e) {
+            $message = "Update failed: " . $e->getMessage();
+            $message_type = "danger";
+        }
+    } else {
+        $message = "Submission date is required.";
+        $message_type = "warning";
+    }
+}
+
 // Fetch admin dashboard stats
 try {
     $current_vol = rjpes_get_setting('current_volume', '20');
@@ -646,6 +677,12 @@ require_once __DIR__ . '/../includes/header.php';
                                         </div>
                                         <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
                                             🕐 <?php echo date('h:i A', strtotime($j['created_at'])); ?>
+                                        </div>
+                                        <div style="margin-top: 5px;">
+                                            <button onclick="openEditDateModal(<?php echo $j['id']; ?>, '<?php echo addslashes(sanitize($j['journal_number'])); ?>', '<?php echo date('Y-m-d\TH:i', strtotime($j['created_at'])); ?>')" 
+                                                    style="background: none; border: 1px solid #94a3b8; color: #475569; font-size: 0.7rem; cursor: pointer; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px; font-weight: 500;">
+                                                ✏️ Edit Date
+                                            </button>
                                         </div>
                                         <?php if ($j['updated_at'] && $j['updated_at'] != $j['created_at']): ?>
                                         <div style="font-size: 0.7rem; color: var(--accent-color); margin-top: 3px; font-weight: 500;">
@@ -940,6 +977,35 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
+<!-- Modal: Edit Submission Date -->
+<div id="editDateModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 450px; width: 95%;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+            <div>
+                <h3 style="font-family: var(--font-heading); color: var(--primary-color); font-size: 1.3rem; margin-bottom: 4px;">Edit Submission Date</h3>
+                <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0;">Update original submission date for <strong id="editDateJournalNo"></strong></p>
+            </div>
+            <button onclick="closeEditDateModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted);">&times;</button>
+        </div>
+
+        <form action="dashboard.php" method="POST">
+            <input type="hidden" name="edit_submission_date" value="1">
+            <input type="hidden" name="journal_id" id="editDateJournalId">
+
+            <div class="form-group">
+                <label for="submission_date" style="font-weight: 600;">Original Submission Date & Time</label>
+                <input type="datetime-local" name="submission_date" id="submission_date" class="form-control" required>
+                <small style="color: var(--text-muted); font-size: 0.72rem;">Set the original date and time this journal was submitted.</small>
+            </div>
+
+            <div style="margin-top: 1.5rem; display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" onclick="closeEditDateModal()" class="btn btn-secondary" style="border: 1px solid var(--border-color); color: var(--primary-color); padding: 8px 16px;">Cancel</button>
+                <button type="submit" class="btn btn-dark" style="padding: 8px 20px; background-color: var(--primary-color); color: white;">💾 Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
 function calculateTotal() {
     var v = parseFloat(document.getElementById('verifier_cut').value) || 0;
@@ -1063,6 +1129,15 @@ function closePublishModal() {
     document.getElementById('publishModal').style.display = 'none';
     document.getElementById('publication_date').value = '';
 }
+function openEditDateModal(journalId, journalNo, currentDateTime) {
+    document.getElementById('editDateJournalId').value = journalId;
+    document.getElementById('editDateJournalNo').textContent = journalNo;
+    document.getElementById('submission_date').value = currentDateTime;
+    document.getElementById('editDateModal').style.display = 'flex';
+}
+function closeEditDateModal() {
+    document.getElementById('editDateModal').style.display = 'none';
+}
 function openEditPublicationModal(journalId, journalNo, volume, issue, pubDate) {
     document.getElementById('editPubJournalId').value = journalId;
     document.getElementById('editPubJournalNo').textContent = journalNo;
@@ -1096,6 +1171,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (dateEl) { dateEl.addEventListener('change', updateEditPubPreview); }
     document.getElementById('editPublicationModal').addEventListener('click', function(e) {
         if (e.target === this) closeEditPublicationModal();
+    });
+    document.getElementById('editDateModal').addEventListener('click', function(e) {
+        if (e.target === this) closeEditDateModal();
     });
 });
 function openTimeline(journalId, journalNo) {

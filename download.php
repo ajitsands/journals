@@ -74,8 +74,20 @@ try {
             $is_authorized = true;
         } elseif (is_logged_in()) {
             $user = get_logged_in_user();
-            if ($user['role'] === 'admin' || $user['id'] == $journal['author_id']) {
+            if ($user['role'] === 'admin') {
                 $is_authorized = true;
+            } elseif ($user['id'] == $journal['author_id']) {
+                if ($type === 'article') {
+                    // Author can only download the article if payment is approved
+                    $pay_stmt = $pdo->prepare("SELECT status FROM payments WHERE journal_id = ?");
+                    $pay_stmt->execute([$id]);
+                    $pay_status = $pay_stmt->fetchColumn();
+                    if ($pay_status === 'approved') {
+                        $is_authorized = true;
+                    }
+                } else {
+                    $is_authorized = true;
+                }
             } else {
                 $rev = $pdo->prepare("SELECT id FROM reviewer_assignments WHERE journal_id=? AND reviewer_id=?");
                 $rev->execute([$id, $user['id']]);

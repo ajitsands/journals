@@ -194,20 +194,27 @@ require_once __DIR__ . '/../includes/header.php';
                                             📅 <?php echo date('d M Y', strtotime($paper['created_at'])); ?>
                                             &nbsp;🕐 <?php echo date('h:i A', strtotime($paper['created_at'])); ?>
                                         </div>
-                                        <!-- Always-visible download button -->
+                                        <!-- Download button restricted by payment approval -->
                                         <?php
                                         $ver_num = intval($paper['current_version'] ?? 1);
                                         $is_revision = $ver_num > 1;
                                         $dl_label = $is_revision ? '⬇ Download v' . $ver_num . ' (Revised)' : '⬇ Download Submitted';
                                         $dl_color = $is_revision ? '#d97706' : '#1e3a5f';
                                         $dl_bg    = $is_revision ? '#fef3c7' : '#eff6ff';
+                                        $payment_approved = ($paper['payment_status'] === 'approved');
                                         ?>
                                         <div style="margin-top: 6px;">
-                                            <a href="<?php echo $path_prefix . htmlspecialchars($paper['manuscript_file']); ?>" target="_blank"
-                                               style="display: inline-flex; align-items: center; gap: 5px; background: <?php echo $dl_bg; ?>; color: <?php echo $dl_color; ?>; border: 1px solid <?php echo $dl_color; ?>40; padding: 4px 10px; border-radius: 5px; font-size: 0.75rem; font-weight: 600; text-decoration: none;">
-                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                                <?php echo $dl_label; ?>
-                                            </a>
+                                            <?php if ($payment_approved): ?>
+                                                <a href="<?php echo $path_prefix; ?>download.php?id=<?php echo $paper['id']; ?>&type=article" target="_blank"
+                                                   style="display: inline-flex; align-items: center; gap: 5px; background: <?php echo $dl_bg; ?>; color: <?php echo $dl_color; ?>; border: 1px solid <?php echo $dl_color; ?>40; padding: 4px 10px; border-radius: 5px; font-size: 0.75rem; font-weight: 600; text-decoration: none;">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                                    <?php echo $dl_label; ?>
+                                                </a>
+                                            <?php else: ?>
+                                                <span style="display: inline-flex; align-items: center; gap: 5px; background: #f1f5f9; color: #94a3b8; border: 1px solid #cbd5e1; padding: 4px 10px; border-radius: 5px; font-size: 0.75rem; font-weight: 600; cursor: not-allowed;" title="Download is locked until payment is approved by admin">
+                                                    🔒 Download Locked (Awaiting Payment Approval)
+                                                </span>
+                                            <?php endif; ?>
                                         </div>
                                     </td>
                                     <td>
