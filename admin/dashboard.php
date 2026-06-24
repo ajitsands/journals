@@ -386,6 +386,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_submission_date'
     }
 }
 
+// 6. Handle Reverting Publication to Author to Pay
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['revert_publication'])) {
+    $journal_id = intval($_POST['journal_id']);
+    
+    if ($journal_id > 0) {
+        try {
+            $pdo->beginTransaction();
+            
+            // Fetch journal number and verify status is published
+            $stmt_chk = $pdo->prepare("SELECT journal_number, status FROM journals WHERE id = ?");
+            $stmt_chk->execute([$journal_id]);
+            $j_info = $stmt_chk->fetch();
+            
+            if ($j_info && $j_info['status'] === 'published') {
+                $journal_number = $j_info['journal_number'];
+                
+                // A. Delete payment proof file from disk
+                $p_stmt = $pdo->prepare("SELECT payment_proof FROM payments WHERE journal_id = ?");
+                $p_stmt->execute([$journal_id]);
+                $p_file = $p_stmt->fetchColumn();
+                if (!empty($p_file)) {
+                    $proof_full_path = __DIR__ . '/../' . $p_file;
+                    if (file_exists($proof_full_path)) {
+                        @unlink($proof_full_path);
+                    }
+                }
+                
+                // B. Delete payment record from payments table
+                $del_pay = $pdo->prepare("DELETE FROM payments WHERE journal_id = ?");
+                $del_pay->execute([$journal_id]);
+                
+                // C. Update journal status back to 'payment_pending' and reset volume/issue/published_at/bill_number
+                $upd_journ = $pdo->prepare("UPDATE journals SET status = 'payment_pending', volume = NULL, issue = NULL, published_at = NULL, bill_number = NULL WHERE id = ?");
+                $upd_journ->execute([$journal_id]);
+                
+                // D. Delete wallet ledger credits for this journal
+                $del_trans = $pdo->prepare("DELETE FROM wallet_transactions WHERE description IN (
+                    CONCAT('Verifier commission for ', :jn1),
+                    CONCAT('Admin verification commission for ', :jn2),
+                    CONCAT('Portal platform commission for ', :jn3)
+                )");
+                $del_trans->execute([
+                    'jn1' => $journal_number,
+                    'jn2' => $journal_number,
+                    'jn3' => $journal_number
+                ]);
+                
+                // E. Re-generate the PDF cover page and body header/footers without publication info
+                try {
+                    require_once __DIR__ . '/../includes/word_helper.php';
+                    rjpes_regenerate_journal_pdf($journal_id);
+                } catch (Exception $pdf_ex) {
+                    error_log("Failed to regenerate PDF on revert publication for journal $journal_id: " . $pdf_ex->getMessage());
+                }
+                
+                $pdo->commit();
+                $message = "Journal manuscript reverted to 'Payment Pending' (Author to Pay) status successfully. Wallet commissions reversed and GST invoice canceled.";
+                $message_type = "success";
+            } else {
+                $pdo->rollBack();
+                $message = "Only published journals can be reverted.";
+                $message_type = "warning";
+            }
+        } catch (PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $message = "Failed to revert publication: " . $e->getMessage();
+            $message_type = "danger";
+        }
+    }
+}
+
 // Fetch admin dashboard stats
 try {
     $current_vol = rjpes_get_setting('current_volume', '20');
@@ -808,6 +881,9 @@ require_once __DIR__ . '/../includes/header.php';
                                                             🧾 GST Invoice
                                                         </a>
                                                     <?php endif; ?>
+                                                    <button onclick="confirmRevert(<?php echo $j['id']; ?>, '<?php echo addslashes(sanitize($j['journal_number'])); ?>')" style="background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; font-size: 0.72rem; cursor: pointer; padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; width: fit-content;" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fef2f2'">
+                                                        ↩️ Revert to Pay Status
+                                                    </button>
                                                 </div>
                                             </div>
                                         <?php else: ?>
@@ -1188,6 +1264,53 @@ function closeTimeline() {
 document.getElementById('timelineModal').addEventListener('click', function(e) {
     if (e.target === this) closeTimeline();
 });
+</script>
+
+<!-- SweetAlert2 library -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+function confirmRevert(journalId, journalNo) {
+    Swal.fire({
+        title: 'Revert to Pay Status?',
+        html: 'Are you sure you want to revert manuscript <strong>' + journalNo + '</strong> back to "Author to Pay" status?<br><br>' +
+              'This will:<br>' +
+              '• Revert journal status to Payment Pending.<br>' +
+              '• Delete the payment verification & proof receipt.<br>' +
+              '• Reverse all wallet commissions credited for this publication.<br>' +
+              '• Cancel the GST Invoice.<br>' +
+              '• Regenerate the PDF manuscript cover page.<br><br>' +
+              '<span style="color: #dc2626; font-weight: 600;">This action cannot be undone!</span>',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#475569',
+        confirmButtonText: 'Yes, revert it!',
+        cancelButtonText: 'Cancel',
+        focusCancel: true
+    }).then((result) => {
+        if (result.isConfirmed) {
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = 'dashboard.php';
+            
+            var inputRevert = document.createElement('input');
+            inputRevert.type = 'hidden';
+            inputRevert.name = 'revert_publication';
+            inputRevert.value = '1';
+            form.appendChild(inputRevert);
+            
+            var inputId = document.createElement('input');
+            inputId.type = 'hidden';
+            inputId.name = 'journal_id';
+            inputId.value = journalId;
+            form.appendChild(inputId);
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+}
 </script>
 
 <!-- Document History Modal -->
