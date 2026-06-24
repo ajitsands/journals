@@ -316,18 +316,38 @@ try {
 
             <div class="card" style="border-left: 4px solid var(--accent-color);">
                 <h3 style="color: var(--primary-color); margin-bottom: 0.5rem; font-family: var(--font-heading); font-size: 1.2rem;">UGC Guidelines</h3>
-                <p style="font-size: 0.85rem; margin-bottom: 1rem;">
+                <p style="font-size: 0.85rem; margin-bottom: 1.25rem;">
                     RJPES follows the standard academic publishing guidelines for peer-reviewed journals. All research articles undergo double-blind peer review to maintain strict scientific standards.
                 </p>
-                <div style="margin-top: 1.25rem;">
-                    <a href="<?php echo $path_prefix; ?>guidelines/9678711_PUBLIC-NOTICE-CARE.pdf" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 600; padding: 10px 16px; border: 1px solid var(--primary-color); color: var(--primary-color); background: rgba(11, 34, 64, 0.03); border-radius: 6px; width: 100%; justify-content: center; transition: var(--transition);" onmouseover="this.style.background='var(--primary-color)'; this.style.color='white'; this.style.transform='translateY(-2px)';" onmouseout="this.style.background='rgba(11, 34, 64, 0.03)'; this.style.color='var(--primary-color)'; this.style.transform='none';">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <a href="<?php echo $path_prefix; ?>guidelines/9678711_PUBLIC-NOTICE-CARE.pdf" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.82rem; font-weight: 600; padding: 10px 12px; border: 1px solid var(--primary-color); color: var(--primary-color); background: rgba(11, 34, 64, 0.03); border-radius: 6px; width: 100%; justify-content: center; transition: var(--transition);" onmouseover="this.style.background='var(--primary-color)'; this.style.color='white'; this.style.transform='translateY(-2px)';" onmouseout="this.style.background='rgba(11, 34, 64, 0.03)'; this.style.color='var(--primary-color)'; this.style.transform='none';">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                             <polyline points="14 2 14 8 20 8"></polyline>
                             <line x1="12" y1="18" x2="12" y2="12"></line>
                             <polyline points="9 15 12 18 15 15"></polyline>
                         </svg>
                         UGC CARE Public Notice (PDF)
+                    </a>
+                    
+                    <a href="<?php echo $path_prefix; ?>guidelines/UGC PEER REVIEWED JOURNAL GUIDELINES.pdf" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.82rem; font-weight: 600; padding: 10px 12px; border: 1px solid var(--primary-color); color: var(--primary-color); background: rgba(11, 34, 64, 0.03); border-radius: 6px; width: 100%; justify-content: center; transition: var(--transition);" onmouseover="this.style.background='var(--primary-color)'; this.style.color='white'; this.style.transform='translateY(-2px)';" onmouseout="this.style.background='rgba(11, 34, 64, 0.03)'; this.style.color='var(--primary-color)'; this.style.transform='none';">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="12" y1="18" x2="12" y2="12"></line>
+                            <polyline points="9 15 12 18 15 15"></polyline>
+                        </svg>
+                        UGC Peer Reviewed Guidelines (PDF)
+                    </a>
+
+                    <a href="<?php echo $path_prefix; ?>guidelines/UGC minimum-Standards-and-Procedure-for-Award-of-PhD-Degree.pdf" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.82rem; font-weight: 600; padding: 10px 12px; border: 1px solid var(--primary-color); color: var(--primary-color); background: rgba(11, 34, 64, 0.03); border-radius: 6px; width: 100%; justify-content: center; transition: var(--transition);" onmouseover="this.style.background='var(--primary-color)'; this.style.color='white'; this.style.transform='translateY(-2px)';" onmouseout="this.style.background='rgba(11, 34, 64, 0.03)'; this.style.color='var(--primary-color)'; this.style.transform='none';">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="12" y1="18" x2="12" y2="12"></line>
+                            <polyline points="9 15 12 18 15 15"></polyline>
+                        </svg>
+                        UGC PhD Award Standards (PDF)
                     </a>
                 </div>
             </div>
