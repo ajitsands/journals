@@ -104,3 +104,54 @@ CREATE TABLE IF NOT EXISTS journal_versions (
     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (journal_id) REFERENCES journals(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- System Settings Table
+CREATE TABLE IF NOT EXISTS system_settings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    setting_key VARCHAR(100) NOT NULL UNIQUE,
+    setting_value VARCHAR(255) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Default Settings Seeds
+INSERT INTO system_settings (setting_key, setting_value) VALUES
+('verifier_cut_pct', '50'),
+('admin_cut_pct', '20'),
+('portal_cut_pct', '30'),
+('current_volume', '20'),
+('current_issue', '1'),
+('current_edition_date', '2026-03-01'),
+('min_processing_fee', '1000'),
+('editor_name', 'Prof. (Dr.) Biju Lona K.'),
+('editor_signature', ''),
+('gst_percentage', '18'),
+('gst_mode', 'exclude'),
+('bill_format', 'SAN/INV/ONLINE/26-27/{SEQ}'),
+('credit_note_format', 'SAN/CN/ONLINE/{FY}/{SEQ}')
+ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value);
+
+-- Wallet Transactions Table
+CREATE TABLE IF NOT EXISTS wallet_transactions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    transaction_type ENUM('credit', 'debit') NOT NULL,
+    description VARCHAR(255) NOT NULL,
+    payment_type VARCHAR(50) DEFAULT NULL,
+    transaction_date DATE DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Credit Notes Table
+CREATE TABLE IF NOT EXISTS credit_notes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    journal_id INT NOT NULL,
+    bill_number VARCHAR(100) NOT NULL,
+    credit_note_number VARCHAR(100) NOT NULL UNIQUE,
+    amount DECIMAL(10,2) NOT NULL,
+    base_amount DECIMAL(10,2) NOT NULL,
+    gst_amount DECIMAL(10,2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (journal_id) REFERENCES journals(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+

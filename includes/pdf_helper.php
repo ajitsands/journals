@@ -1545,5 +1545,379 @@ class RJPES_PDF {
         
         return $this->buffer;
     }
+
+    /**
+     * Generate dynamic Credit Note PDF
+     */
+    public function generateCreditNote($credit_note) {
+        $title = $credit_note['title'];
+        $author = $credit_note['author_name'];
+        $email = $credit_note['author_email'] ?? '';
+        $domain = $credit_note['subject_domain'];
+        $number = $credit_note['journal_number'];
+        $bill_number = $credit_note['bill_number'];
+        $credit_note_number = $credit_note['credit_note_number'];
+        
+        $base = floatval($credit_note['base_amount']);
+        $gst = floatval($credit_note['gst_amount']);
+        $total = floatval($credit_note['amount']);
+        $cgst = $gst / 2;
+        $sgst = $gst / 2;
+        
+        $cn_date = !empty($credit_note['created_at']) ? strtotime($credit_note['created_at']) : time();
+        $date_str = date('d F Y', $cn_date);
+        
+        // Fetch dynamic GST percentage from DB settings
+        $gst_pct = floatval(rjpes_get_setting('gst_percentage', '18'));
+        
+        // Define page contents
+        $content_stream = "";
+        
+        // Helvetica Bold descriptor
+        $font_bold_id = 5;
+        // Helvetica Standard descriptor
+        $font_normal_id = 6;
+        
+        // Deep Navy color definitions for PDF
+        $navy_fill = "0.04 0.13 0.25 rg\n";
+        $navy_stroke = "0.04 0.13 0.25 RG\n";
+        $black_fill = "0 g\n";
+        $black_stroke = "0 G\n";
+        
+        // Header Text: SaNDS Lab (Invoice Generator / Payee Company)
+        $content_stream .= "BT\n";
+        $content_stream .= $navy_fill;
+        $content_stream .= "/F2 13 Tf\n";
+        $content_stream .= "54 805 Td (" . $this->escape_text("SaNDS Lab") . ") Tj\n";
+        $content_stream .= "ET\n";
+        
+        $content_stream .= "BT\n";
+        $content_stream .= "0.3 g\n";
+        $content_stream .= "/F1 8.5 Tf\n";
+        $content_stream .= "54 793 Td (" . $this->escape_text("XI/866, Chandanam Block, Infopark, Koratty, Thrissur, Kerala - 680308") . ") Tj\n";
+        $content_stream .= "ET\n";
+        
+        $content_stream .= "BT\n";
+        $content_stream .= "0.3 g\n";
+        $content_stream .= "/F1 8.5 Tf\n";
+        $content_stream .= "54 782 Td (" . $this->escape_text("GST No: 32ABQFS7745B1Z1") . ") Tj\n";
+        $content_stream .= "ET\n";
+        
+        $content_stream .= "BT\n";
+        $content_stream .= "0.4 g\n";
+        $content_stream .= "/F1 8 Tf\n";
+        $content_stream .= "54 769 Td (" . $this->escape_text("In association with") . ") Tj\n";
+        $content_stream .= "ET\n";
+        
+        $content_stream .= "BT\n";
+        $content_stream .= $navy_fill;
+        $content_stream .= "/F2 11 Tf\n";
+        $content_stream .= "54 756 Td (" . $this->escape_text("RESEARCH JOURNAL ON PHYSICAL EDUCATION AND SPORTS (RJPES)") . ") Tj\n";
+        $content_stream .= "ET\n";
+        
+        $content_stream .= "BT\n";
+        $content_stream .= "0.3 g\n";
+        $content_stream .= "/F1 8.5 Tf\n";
+        $content_stream .= "54 744 Td (" . $this->escape_text("ISSN: 0975-4687 (Online) | Peer-Reviewed | Official Journal Portal") . ") Tj\n";
+        $content_stream .= "ET\n";
+        
+        $content_stream .= "BT\n";
+        $content_stream .= "0.3 g\n";
+        $content_stream .= "/F1 8.5 Tf\n";
+        $content_stream .= "54 732 Td (" . $this->escape_text("ACTPE, Association of College Teachers of Physical Education, Calicut University") . ") Tj\n";
+        $content_stream .= "ET\n";
+        
+        // Right header: "CREDIT NOTE"
+        $content_stream .= "BT\n";
+        $content_stream .= $navy_fill;
+        $content_stream .= "/F2 15 Tf\n";
+        $content_stream .= "430 790 Td (" . $this->escape_text("CREDIT NOTE") . ") Tj\n";
+        $content_stream .= "ET\n";
+        
+        // Draw Header Border Lines
+        $content_stream .= "0.75 w\n";
+        $content_stream .= $navy_stroke;
+        $content_stream .= "54 726 m 541 726 l S\n"; // top thick line
+        $content_stream .= "0.25 w\n";
+        $content_stream .= "54 722 m 541 722 l S\n"; // bottom thin line
+        
+        // Details & Reference Numbers (two columns)
+        $y = 696;
+        // Left Column (Credit Note Details)
+        $content_stream .= "BT\n/F2 9.5 Tf\n0 g\n54 " . $y . " Td (Credit Note Details) Tj\nET\n";
+        $content_stream .= "BT\n/F1 9 Tf\n54 " . ($y - 15) . " Td (Credit Note No: " . $this->escape_text($credit_note_number) . ") Tj\nET\n";
+        $content_stream .= "BT\n/F1 9 Tf\n54 " . ($y - 27) . " Td (Credit Note Date: " . $this->escape_text($date_str) . ") Tj\nET\n";
+        $content_stream .= "BT\n/F1 9 Tf\n54 " . ($y - 39) . " Td (Original Invoice: " . $this->escape_text($bill_number) . ") Tj\nET\n";
+        
+        // Right Column (Reference Details)
+        $content_stream .= "BT\n/F2 9.5 Tf\n320 " . $y . " Td (Reference Details) Tj\nET\n";
+        $content_stream .= "BT\n/F1 9 Tf\n320 " . ($y - 15) . " Td (Manuscript Ref: " . $this->escape_text($number) . ") Tj\nET\n";
+        $content_stream .= "BT\n/F1 9 Tf\n320 " . ($y - 27) . " Td (SAC Code: 998431 (Scholarly Journals)) Tj\nET\n";
+        $content_stream .= "BT\n/F1 9 Tf\n320 " . ($y - 39) . " Td (Reason: Reversion of Manuscript) Tj\nET\n";
+        
+        // Bill To section
+        $y_bill = $y - 75;
+        $content_stream .= "0.5 w\n0.8 g\n54 " . ($y_bill + 18) . " m 541 " . ($y_bill + 18) . " l S\n"; // Divider
+        
+        $content_stream .= "BT\n/F2 10 Tf\n0.04 0.13 0.25 rg\n54 " . $y_bill . " Td (BILL TO (Author Info)) Tj\nET\n";
+        $content_stream .= "BT\n/F2 9.5 Tf\n0 g\n54 " . ($y_bill - 15) . " Td (" . $this->escape_text($author) . ") Tj\nET\n";
+        $content_stream .= "BT\n/F1 9 Tf\n54 " . ($y_bill - 27) . " Td (Corresponding Author, RJPES Journal) Tj\nET\n";
+        $content_stream .= "BT\n/F1 9 Tf\n54 " . ($y_bill - 39) . " Td (Email: " . $this->escape_text($email) . ") Tj\nET\n";
+        $content_stream .= "BT\n/F1 9 Tf\n54 " . ($y_bill - 51) . " Td (Subject Domain: " . $this->escape_text($domain) . ") Tj\nET\n";
+        
+        // Particulars Table
+        $y_table = $y_bill - 83;
+        $table_h = 20;
+        
+        // Header background
+        $content_stream .= "0.04 0.13 0.25 rg\n";
+        $content_stream .= "54 " . ($y_table - $table_h) . " 487 " . $table_h . " re f\n";
+        
+        // Header Texts
+        $content_stream .= "BT\n/F2 8.5 Tf\n1 g\n";
+        $content_stream .= "58 " . ($y_table - 14) . " Td (S.No) Tj\n";
+        $content_stream .= "ET\n";
+        
+        $content_stream .= "BT\n/F2 8.5 Tf\n1 g\n";
+        $content_stream .= "88 " . ($y_table - 14) . " Td (Item Description) Tj\n";
+        $content_stream .= "ET\n";
+        
+        $content_stream .= "BT\n/F2 8.5 Tf\n1 g\n";
+        $content_stream .= "298 " . ($y_table - 14) . " Td (SAC) Tj\n";
+        $content_stream .= "ET\n";
+        
+        $content_stream .= "BT\n/F2 8.5 Tf\n1 g\n";
+        $content_stream .= (410 - $this->get_text_width("Base (INR)", 8.5)) . " " . ($y_table - 14) . " Td (Base (INR)) Tj\n";
+        $content_stream .= "ET\n";
+        
+        $cgst_header = "CGST (" . ($gst_pct/2) . "%)";
+        $content_stream .= "BT\n/F2 8.5 Tf\n1 g\n";
+        $content_stream .= (470 - $this->get_text_width($cgst_header, 8.5)) . " " . ($y_table - 14) . " Td (" . $cgst_header . ") Tj\n";
+        $content_stream .= "ET\n";
+        
+        $sgst_header = "SGST (" . ($gst_pct/2) . "%)";
+        $content_stream .= "BT\n/F2 8.5 Tf\n1 g\n";
+        $content_stream .= (537 - $this->get_text_width($sgst_header, 8.5)) . " " . ($y_table - 14) . " Td (" . $sgst_header . ") Tj\n";
+        $content_stream .= "ET\n";
+        
+        // Row Details
+        $row_y = $y_table - $table_h;
+        $row_h = 35;
+        
+        $title_short = strlen($title) > 42 ? substr($title, 0, 39) . "..." : $title;
+        $desc_line1 = "Reversal of Publication & Processing Fee";
+        $desc_line2 = "Ref: " . $number . " (" . $title_short . ")";
+        
+        // Row Box & vertical dividers
+        $content_stream .= "0.5 w\n0.04 0.13 0.25 RG\n";
+        $content_stream .= "54 " . ($row_y - $row_h) . " 487 " . $row_h . " re S\n";
+        
+        $content_stream .= "84 " . $row_y . " m 84 " . ($row_y - $row_h) . " l S\n";
+        $content_stream .= "294 " . $row_y . " m 294 " . ($row_y - $row_h) . " l S\n";
+        $content_stream .= "344 " . $row_y . " m 344 " . ($row_y - $row_h) . " l S\n";
+        $content_stream .= "414 " . $row_y . " m 414 " . ($row_y - $row_h) . " l S\n";
+        $content_stream .= "474 " . $row_y . " m 474 " . ($row_y - $row_h) . " l S\n";
+        
+        // Row values
+        $content_stream .= "BT\n/F1 9 Tf\n0 g\n";
+        $content_stream .= "64 " . ($row_y - 16) . " Td (1) Tj\n";
+        $content_stream .= "ET\n";
+        
+        $content_stream .= "BT\n/F1 9 Tf\n0 g\n";
+        $content_stream .= "88 " . ($row_y - 14) . " Td (" . $this->escape_text($desc_line1) . ") Tj\n";
+        $content_stream .= "ET\n";
+        $content_stream .= "BT\n/F1 8.5 Tf\n0.3 g\n";
+        $content_stream .= "88 " . ($row_y - 25) . " Td (" . $this->escape_text($desc_line2) . ") Tj\n";
+        $content_stream .= "ET\n";
+        
+        $content_stream .= "BT\n/F1 9 Tf\n0 g\n";
+        $content_stream .= "298 " . ($row_y - 16) . " Td (998431) Tj\n";
+        $content_stream .= "ET\n";
+        
+        $base_val_str = number_format($base, 2);
+        $content_stream .= "BT\n/F1 9 Tf\n0 g\n";
+        $content_stream .= (410 - $this->get_text_width($base_val_str, 9)) . " " . ($row_y - 16) . " Td (" . $base_val_str . ") Tj\n";
+        $content_stream .= "ET\n";
+        
+        $cgst_val_str = number_format($cgst, 2);
+        $content_stream .= "BT\n/F1 9 Tf\n0 g\n";
+        $content_stream .= (470 - $this->get_text_width($cgst_val_str, 9)) . " " . ($row_y - 16) . " Td (" . $cgst_val_str . ") Tj\n";
+        $content_stream .= "ET\n";
+        
+        $sgst_val_str = number_format($sgst, 2);
+        $content_stream .= "BT\n/F1 9 Tf\n0 g\n";
+        $content_stream .= (537 - $this->get_text_width($sgst_val_str, 9)) . " " . ($row_y - 16) . " Td (" . $sgst_val_str . ") Tj\n";
+        $content_stream .= "ET\n";
+        
+        // Summary Breakdown Box (right aligned)
+        $sum_y = $row_y - $row_h - 12;
+        $sum_box_w = 197;
+        $sum_box_h = 56;
+        $sum_box_x = 344;
+        
+        $content_stream .= "0.5 w\n0.04 0.13 0.25 RG\n";
+        $content_stream .= $sum_box_x . " " . ($sum_y - $sum_box_h) . " " . $sum_box_w . " " . $sum_box_h . " re S\n";
+        $content_stream .= $sum_box_x . " " . ($sum_y - 18) . " m 541 " . ($sum_y - 18) . " l S\n";
+        $content_stream .= $sum_box_x . " " . ($sum_y - 36) . " m 541 " . ($sum_y - 36) . " l S\n";
+        
+        // Summary texts
+        $subtotal_val = "INR " . number_format($base, 2);
+        $content_stream .= "BT\n/F1 8.5 Tf\n0.3 g\n" . ($sum_box_x + 8) . " " . ($sum_y - 12) . " Td (Subtotal Reversed:) Tj\nET\n";
+        $content_stream .= "BT\n/F1 9 Tf\n0 g\n" . (533 - $this->get_text_width($subtotal_val, 9)) . " " . ($sum_y - 12) . " Td (" . $subtotal_val . ") Tj\nET\n";
+        
+        $gst_val = "INR " . number_format($gst, 2);
+        $content_stream .= "BT\n/F1 8.5 Tf\n0.3 g\n" . ($sum_box_x + 8) . " " . ($sum_y - 30) . " Td (GST Reversed (" . $gst_pct . "%):) Tj\nET\n";
+        $content_stream .= "BT\n/F1 9 Tf\n0 g\n" . (533 - $this->get_text_width($gst_val, 9)) . " " . ($sum_y - 30) . " Td (" . $gst_val . ") Tj\nET\n";
+        
+        $total_val = "INR " . number_format($total, 2);
+        $content_stream .= "BT\n/F2 9 Tf\n0.04 0.13 0.25 rg\n" . ($sum_box_x + 8) . " " . ($sum_y - 48) . " Td (Total Credited:) Tj\nET\n";
+        $content_stream .= "BT\n/F2 9.5 Tf\n0.04 0.13 0.25 rg\n" . (533 - $this->get_text_width($total_val, 9.5)) . " " . ($sum_y - 48) . " Td (" . $total_val . ") Tj\nET\n";
+        
+        // Amount in words (left side of summary box)
+        $words_text = "Total Credited Value in Words: " . $this->convert_number_to_words($total);
+        $words_lines = $this->split_text_to_lines($words_text, 8.5, 270);
+        $word_y = $sum_y - 12;
+        foreach ($words_lines as $w_line) {
+            $content_stream .= "BT\n/F1 8.5 Tf\n0 g\n54 " . $word_y . " Td (" . $this->escape_text($w_line) . ") Tj\nET\n";
+            $word_y -= 12;
+        }
+        
+        // Editor signature & name
+        $sig_y = $sum_y - $sum_box_h - 70;
+        $sig_path = rjpes_get_setting('editor_signature', '');
+        $has_sig = !empty($sig_path);
+        
+        if ($has_sig) {
+            $sig_abs_path = __DIR__ . '/../' . ltrim(str_replace(['/', '\\'], '/', $sig_path), '/');
+            $img_w = 150;
+            $img_h = 50;
+            if (file_exists($sig_abs_path)) {
+                $info = @getimagesize($sig_abs_path);
+                if ($info) {
+                    $img_w = $info[0];
+                    $img_h = $info[1];
+                }
+            }
+            $max_sig_h = 35;
+            $max_sig_w = 150;
+            $scale = min($max_sig_w / $img_w, $max_sig_h / $img_h);
+            $draw_w = $img_w * $scale;
+            $draw_h = $img_h * $scale;
+            
+            $content_stream .= "q\n";
+            $content_stream .= sprintf("%.2f 0 0 %.2f 54 %.2f cm\n", $draw_w, $draw_h, $sig_y + 10);
+            $content_stream .= "/SigImg Do\n";
+            $content_stream .= "Q\n";
+        }
+        
+        $editor_name = rjpes_get_setting('editor_name', 'Prof. (Dr.) Biju Lona K.');
+        
+        $content_stream .= "BT\n";
+        $content_stream .= "0.04 0.13 0.25 rg\n";
+        $content_stream .= "/F2 10 Tf\n";
+        $content_stream .= "54 " . $sig_y . " Td (" . $this->escape_text($editor_name) . ") Tj\n";
+        $content_stream .= "ET\n";
+        
+        $content_stream .= "BT\n";
+        $content_stream .= "0 g\n";
+        $content_stream .= "/F1 9 Tf\n";
+        $content_stream .= "54 " . ($sig_y - 12) . " Td (Editor-in-Chief, RJPES) Tj\n";
+        $content_stream .= "ET\n";
+        
+        $content_stream .= "BT\n/F1 8 Tf\n0.4 g\n";
+        $content_stream .= "54 " . ($sig_y - 32) . " Td (" . $this->escape_text("Note: This is an official electronic credit note generated for the cancellation/reversal of publication and processing fees.") . ") Tj\n";
+        $content_stream .= "ET\n";
+        
+        // Footer Line & Text
+        $content_stream .= "0.5 w\n";
+        $content_stream .= "0.7 g\n";
+        $content_stream .= "54 50 m 541 50 l S\n";
+        
+        $content_stream .= "BT\n";
+        $content_stream .= "0.5 g\n";
+        $content_stream .= "/F1 8 Tf\n";
+        $footer_text = "RJPES Editorial Office | Association of College Teachers of Physical Education | Calicut University | Website: www.rjpes.in";
+        $content_stream .= "80 38 Td (" . $this->escape_text($footer_text) . ") Tj\n";
+        $content_stream .= "ET\n";
+        
+        $pages_content = [$content_stream];
+        
+        // Compile binary objects for PDF
+        $catalog_id = $this->new_object();
+        $this->write("<< /Type /Catalog /Pages 2 0 R >>\n");
+        $this->end_object();
+        
+        $this->offsets[2] = -1;
+        
+        // Embed signature image if configured
+        $img_info = null;
+        if ($has_sig) {
+            $sig_abs_path = __DIR__ . '/../' . ltrim(str_replace(['/', '\\'], '/', $sig_path), '/');
+            if (file_exists($sig_abs_path)) {
+                $img_info = $this->embed_jpeg_image($sig_abs_path);
+            }
+        }
+        
+        // Font 1 (Regular)
+        $font1_id = $this->new_object();
+        $this->write("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\n");
+        $this->end_object();
+        
+        // Font 2 (Bold)
+        $font2_id = $this->new_object();
+        $this->write("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>\n");
+        $this->end_object();
+        
+        // Resources object containing fonts
+        $resources_id = $this->new_object();
+        if ($img_info) {
+            $this->write("<< /Font << /F1 " . $font1_id . " 0 R /F2 " . $font2_id . " 0 R >> /XObject << /SigImg " . $img_info['id'] . " 0 R >> >>\n");
+        } else {
+            $this->write("<< /Font << /F1 " . $font1_id . " 0 R /F2 " . $font2_id . " 0 R >> >>\n");
+        }
+        $this->end_object();
+        
+        // Compile pages list
+        $page_ids = [];
+        $page_obj_ids = [];
+        
+        foreach ($pages_content as $idx => $p_content) {
+            $stream_id = $this->new_object();
+            $this->write("<< /Length " . strlen($p_content) . " >>\n");
+            $this->write("stream\n" . $p_content . "\nendstream\n");
+            $this->end_object();
+            $page_ids[] = $stream_id;
+            
+            $page_obj_id = $this->new_object();
+            $this->write("<< /Type /Page /Parent 2 0 R /Resources " . $resources_id . " 0 R /MediaBox [0 0 595.28 841.89] /Contents " . $stream_id . " 0 R >>\n");
+            $this->end_object();
+            $page_obj_ids[] = $page_obj_id;
+        }
+        
+        // Pages List Catalog
+        $this->offsets[2] = strlen($this->buffer);
+        $this->write("2 0 obj\n");
+        $kids_str = "[" . implode(" 0 R ", $page_obj_ids) . " 0 R]";
+        $this->write("<< /Type /Pages /Kids " . $kids_str . " /Count " . count($page_obj_ids) . " >>\n");
+        $this->end_object();
+        
+        // Cross reference table
+        $xref_start = strlen($this->buffer);
+        $this->write("xref\n");
+        $this->write("0 " . (count($this->offsets) + 1) . "\n");
+        $this->write("0000000000 65535 f \n");
+        
+        for ($i = 1; $i <= count($this->offsets); $i++) {
+            $this->write(sprintf("%010d 00000 n \n", $this->offsets[$i]));
+        }
+        
+        $this->write("trailer\n");
+        $this->write("<< /Size " . (count($this->offsets) + 1) . " /Root 1 0 R >>\n");
+        $this->write("startxref\n");
+        $this->write($xref_start . "\n");
+        $this->write("%%EOF\n");
+        
+        return $this->buffer;
+    }
 }
 ?>

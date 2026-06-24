@@ -45,10 +45,39 @@ function streamRawPdf(string $data, string $dl_name): void {
 $id   = isset($_GET['id'])   ? intval($_GET['id'])              : 0;
 $type = isset($_GET['type']) ? trim($_GET['type'])              : 'article';
 
-if ($id <= 0) die("Invalid journal ID.");
-if (!in_array($type, ['certificate', 'article', 'acceptance', 'invoice'])) $type = 'article';
+if ($id <= 0) die("Invalid ID.");
+if (!in_array($type, ['certificate', 'article', 'acceptance', 'invoice', 'credit_note'])) $type = 'article';
 
 try {
+    // ── Fetch and handle Credit Note if type is credit_note ─────────────────
+    if ($type === 'credit_note') {
+        $cn_stmt = $pdo->prepare(
+            "SELECT cn.*, j.title, j.journal_number, j.author_id, u.fullname AS author_name, u.email AS author_email, j.subject_domain
+             FROM credit_notes cn
+             JOIN journals j ON cn.journal_id = j.id
+             JOIN users u ON j.author_id = u.id
+             WHERE cn.id = ?"
+        );
+        $cn_stmt->execute([$id]);
+        $credit_note = $cn_stmt->fetch();
+        if (!$credit_note) die("Credit note not found.");
+        
+        // Authorization check: only admin and the specific author can download the credit note
+        $is_authorized = false;
+        if (is_logged_in()) {
+            $user = get_logged_in_user();
+            if ($user['role'] === 'admin' || $user['id'] == $credit_note['author_id']) {
+                $is_authorized = true;
+            }
+        }
+        if (!$is_authorized) die("You are not authorized to download this file.");
+        
+        $base_name = "RJPES_" . str_replace('-', '_', $credit_note['journal_number']);
+        $pdf      = new RJPES_PDF();
+        $pdf_data = $pdf->generateCreditNote($credit_note);
+        streamRawPdf($pdf_data, $base_name . '_Credit_Note.pdf');
+    }
+
     // ── Fetch journal ─────────────────────────────────────────────────────────
     $stmt = $pdo->prepare(
         "SELECT j.*, u.fullname AS author_name, u.email AS author_email

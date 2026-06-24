@@ -394,13 +394,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['revert_publication'])
         try {
             $pdo->beginTransaction();
             
-            // Fetch journal number and verify status is published
-            $stmt_chk = $pdo->prepare("SELECT journal_number, status FROM journals WHERE id = ?");
+            // Fetch journal details and verify status is published
+            $stmt_chk = $pdo->prepare("SELECT journal_number, status, payment_amount, base_amount, gst_amount, bill_number FROM journals WHERE id = ?");
             $stmt_chk->execute([$journal_id]);
             $j_info = $stmt_chk->fetch();
             
             if ($j_info && $j_info['status'] === 'published') {
                 $journal_number = $j_info['journal_number'];
+                $bill_number = $j_info['bill_number'];
+                $credit_note_number = '';
+                
+                // Generate Credit Note if bill number is present
+                if (!empty($bill_number)) {
+                    $revert_time = time();
+                    $month = intval(date('m', $revert_time));
+                    $year = intval(date('Y', $revert_time));
+                    $year_short = intval(date('y', $revert_time));
+                    
+                    if ($month >= 4) {
+                        $fy_start = date('Y-04-01 00:00:00', $revert_time);
+                        $fy_end = date(($year + 1) . '-03-31 23:59:59', $revert_time);
+                        $fy_label = $year_short . '-' . ($year_short + 1);
+                    } else {
+                        $fy_start = date(($year - 1) . '-04-01 00:00:00', $revert_time);
+                        $fy_end = date('Y-03-31 23:59:59', $revert_time);
+                        $fy_label = ($year_short - 1) . '-' . $year_short;
+                    }
+                    
+                    $stmt_cn_count = $pdo->prepare("SELECT COUNT(*) FROM credit_notes WHERE created_at BETWEEN ? AND ?");
+                    $stmt_cn_count->execute([$fy_start, $fy_end]);
+                    $cn_count = intval($stmt_cn_count->fetchColumn());
+                    $next_seq = sprintf("%04d", $cn_count + 1);
+                    
+                    $stmt_fmt = $pdo->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'credit_note_format'");
+                    $stmt_fmt->execute();
+                    $cn_format = $stmt_fmt->fetchColumn();
+                    if (!$cn_format) {
+                        $cn_format = 'SAN/CN/ONLINE/{FY}/{SEQ}';
+                    }
+                    $credit_note_number = str_replace(['{FY}', '{SEQ}'], [$fy_label, $next_seq], $cn_format);
+                    
+                    $stmt_ins_cn = $pdo->prepare("
+                        INSERT INTO credit_notes (journal_id, bill_number, credit_note_number, amount, base_amount, gst_amount) 
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    ");
+                    $stmt_ins_cn->execute([
+                        $journal_id,
+                        $bill_number,
+                        $credit_note_number,
+                        floatval($j_info['payment_amount']),
+                        floatval($j_info['base_amount']),
+                        floatval($j_info['gst_amount'])
+                    ]);
+                }
                 
                 // A. Delete payment proof file from disk
                 $p_stmt = $pdo->prepare("SELECT payment_proof FROM payments WHERE journal_id = ?");
@@ -442,7 +488,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['revert_publication'])
                 }
                 
                 $pdo->commit();
-                $message = "Journal manuscript reverted to 'Payment Pending' (Author to Pay) status successfully. Wallet commissions reversed and GST invoice canceled.";
+                if (!empty($credit_note_number)) {
+                    $message = "Journal manuscript reverted to 'Payment Pending' (Author to Pay) status successfully. Wallet commissions reversed and Credit Note <strong>$credit_note_number</strong> generated to cancel the tax invoice.";
+                } else {
+                    $message = "Journal manuscript reverted to 'Payment Pending' (Author to Pay) status successfully. Wallet commissions reversed.";
+                }
                 $message_type = "success";
             } else {
                 $pdo->rollBack();

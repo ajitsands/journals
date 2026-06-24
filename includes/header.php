@@ -75,6 +75,7 @@ $logged_user = get_logged_in_user();
                                 <a href="<?php echo $path_prefix; ?>admin/verifiers.php" class="<?php echo ($current_page == 'verifiers.php') ? 'active' : ''; ?>">Manage Verifiers</a>
                                 <a href="<?php echo $path_prefix; ?>admin/admins.php" class="<?php echo ($current_page == 'admins.php') ? 'active' : ''; ?>">Manage Admins</a>
                                 <a href="<?php echo $path_prefix; ?>admin/wallets.php" class="<?php echo ($current_page == 'wallets.php') ? 'active' : ''; ?>">Manage Wallets</a>
+                                <a href="<?php echo $path_prefix; ?>admin/invoices.php" class="<?php echo ($current_page == 'invoices.php') ? 'active' : ''; ?>">Month-Wise Invoices</a>
                             <?php elseif ($logged_user['role'] == 'author'): ?>
                                 <a href="<?php echo $path_prefix; ?>author/dashboard.php" class="<?php echo ($current_page == 'dashboard.php' && strpos($_SERVER['PHP_SELF'], '/author/') !== false) ? 'active' : ''; ?>">My Submissions</a>
                                 <a href="<?php echo $path_prefix; ?>author/submit.php" class="<?php echo ($current_page == 'submit.php') ? 'active' : ''; ?>">Submit New Paper</a>
