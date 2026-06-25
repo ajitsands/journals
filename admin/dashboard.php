@@ -279,21 +279,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['publish_journal'])) {
                 $p_cut = $base_amount * ($default_p_pct / 100);
             }
             
-            $ins_trans = $pdo->prepare("INSERT INTO wallet_transactions (user_id, amount, transaction_type, description) VALUES (?, ?, 'credit', ?)");
+            // Check if wallet transactions already exist for this journal to prevent double-crediting
+            $chk_trans = $pdo->prepare("SELECT COUNT(*) FROM wallet_transactions WHERE description LIKE ?");
+            $chk_trans->execute(["%" . $j_row['journal_number']]);
+            $has_transactions = intval($chk_trans->fetchColumn()) > 0;
             
-            // C. Credit Verifier
-            if ($reviewer_id && $v_cut > 0) {
-                $ins_trans->execute([$reviewer_id, $v_cut, "Verifier commission for " . $j_row['journal_number']]);
-            }
-            
-            // D. Credit Admin (the one who verified)
-            if ($a_cut > 0) {
-                $ins_trans->execute([$_SESSION['user_id'], $a_cut, "Admin verification commission for " . $j_row['journal_number']]);
-            }
-            
-            // E. Credit Portal (user_id = null)
-            if ($p_cut > 0) {
-                $ins_trans->execute([null, $p_cut, "Portal platform commission for " . $j_row['journal_number']]);
+            if (!$has_transactions) {
+                $ins_trans = $pdo->prepare("INSERT INTO wallet_transactions (user_id, amount, transaction_type, description) VALUES (?, ?, 'credit', ?)");
+                
+                // C. Credit Verifier
+                if ($reviewer_id && $v_cut > 0) {
+                    $ins_trans->execute([$reviewer_id, $v_cut, "Verifier commission for " . $j_row['journal_number']]);
+                }
+                
+                // D. Credit Admin (the one who verified)
+                if ($a_cut > 0) {
+                    $ins_trans->execute([$_SESSION['user_id'], $a_cut, "Admin verification commission for " . $j_row['journal_number']]);
+                }
+                
+                // E. Credit Portal (user_id = null)
+                if ($p_cut > 0) {
+                    $ins_trans->execute([null, $p_cut, "Portal platform commission for " . $j_row['journal_number']]);
+                }
             }
             
             $pdo->commit();
@@ -504,6 +511,92 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['revert_publication'])
                 $pdo->rollBack();
             }
             $message = "Failed to revert publication: " . $e->getMessage();
+            $message_type = "danger";
+        }
+    }
+}
+
+// 7. Handle Direct Admin Approval of Manuscript (Bypassing verifier or directly approving revision)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['approve_manuscript'])) {
+    $journal_id = intval($_POST['journal_id']);
+    
+    if ($journal_id > 0) {
+        try {
+            $pdo->beginTransaction();
+            
+            // Fetch journal details
+            $stmt_chk = $pdo->prepare("SELECT journal_number, status FROM journals WHERE id = ?");
+            $stmt_chk->execute([$journal_id]);
+            $j_info = $stmt_chk->fetch();
+            
+            $allowed_statuses = ['submitted_waiting_review', 'under_review', 'revisions_required'];
+            if ($j_info && in_array($j_info['status'], $allowed_statuses)) {
+                // Update active reviewer assignment if any to 'reviewed'
+                $upd_assign = $pdo->prepare("UPDATE reviewer_assignments SET status = 'reviewed' WHERE journal_id = ? AND status = 'assigned'");
+                $upd_assign->execute([$journal_id]);
+                
+                // Update journal status to ready_for_publish
+                $upd_journ = $pdo->prepare("UPDATE journals SET status = 'ready_for_publish' WHERE id = ?");
+                $upd_journ->execute([$journal_id]);
+                
+                $pdo->commit();
+                $message = "Manuscript <strong>" . sanitize($j_info['journal_number']) . "</strong> has been approved directly by Administrator and is now ready for publication.";
+                $message_type = "success";
+            } else {
+                $pdo->rollBack();
+                $message = "Only pending, under review, or revision-required manuscripts can be approved directly.";
+                $message_type = "warning";
+            }
+        } catch (PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $message = "Failed to approve manuscript: " . $e->getMessage();
+            $message_type = "danger";
+        }
+    }
+}
+
+// 8. Handle Unpublishing Journal (Request Revision - Preserves Invoices & Wallet Credits)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['unpublish_journal'])) {
+    $journal_id = intval($_POST['journal_id']);
+    
+    if ($journal_id > 0) {
+        try {
+            $pdo->beginTransaction();
+            
+            // Check status is published
+            $stmt_chk = $pdo->prepare("SELECT journal_number, status FROM journals WHERE id = ?");
+            $stmt_chk->execute([$journal_id]);
+            $j_info = $stmt_chk->fetch();
+            
+            if ($j_info && $j_info['status'] === 'published') {
+                // Update journal status back to 'revisions_required' and reset volume/issue/published_at
+                // Note: we do NOT clear bill_number, payments, or wallet_transactions!
+                $upd_journ = $pdo->prepare("UPDATE journals SET status = 'revisions_required', volume = NULL, issue = NULL, published_at = NULL WHERE id = ?");
+                $upd_journ->execute([$journal_id]);
+                
+                // Regenerate the PDF cover page and body header/footers without publication info
+                try {
+                    require_once __DIR__ . '/../includes/word_helper.php';
+                    rjpes_regenerate_journal_pdf($journal_id);
+                } catch (Exception $pdf_ex) {
+                    error_log("Failed to regenerate PDF on unpublish for journal $journal_id: " . $pdf_ex->getMessage());
+                }
+                
+                $pdo->commit();
+                $message = "Journal manuscript <strong>" . sanitize($j_info['journal_number']) . "</strong> unpublished successfully. Status set to 'Revisions Required' so the author can upload updates. Payment & invoice details remain preserved.";
+                $message_type = "success";
+            } else {
+                $pdo->rollBack();
+                $message = "Only published journals can be unpublished.";
+                $message_type = "warning";
+            }
+        } catch (PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $message = "Failed to unpublish journal: " . $e->getMessage();
             $message_type = "danger";
         }
     }
@@ -873,10 +966,18 @@ require_once __DIR__ . '/../includes/header.php';
                                     </td>
                                     <td>
                                         <?php if ($j['status'] === 'ready_for_publish'): ?>
-                                            <!-- Fix Fee Button -->
-                                            <button onclick="openFeeModal(<?php echo $j['id']; ?>, '<?php echo addslashes(sanitize($j['journal_number'])); ?>', null, null, null, '<?php echo $j['gst_type']; ?>')" class="btn btn-primary" style="padding: 6px 12px; font-size: 0.8rem; background-color: var(--accent-color); color: var(--primary-dark);">
-                                                Fix Publication Fee
-                                            </button>
+                                            <?php if ($j['payment_status'] === 'approved'): ?>
+                                                <div style="display: flex; flex-direction: column; gap: 5px;">
+                                                    <button onclick="openPublishModal(<?php echo $j['id']; ?>, '<?php echo addslashes(sanitize($j['journal_number'])); ?>')" class="btn btn-dark" style="padding: 6px 12px; font-size: 0.8rem; background-color: var(--success-color); border: none; color: white; border-radius: 4px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
+                                                        Publish Manuscript
+                                                    </button>
+                                                </div>
+                                            <?php else: ?>
+                                                <!-- Fix Fee Button -->
+                                                <button onclick="openFeeModal(<?php echo $j['id']; ?>, '<?php echo addslashes(sanitize($j['journal_number'])); ?>', null, null, null, '<?php echo $j['gst_type']; ?>')" class="btn btn-primary" style="padding: 6px 12px; font-size: 0.8rem; background-color: var(--accent-color); color: var(--primary-dark);">
+                                                    Fix Publication Fee
+                                                </button>
+                                            <?php endif; ?>
                                         <?php elseif ($j['status'] === 'payment_pending'): ?>
                                             <?php if ($j['payment_status'] === 'pending'): ?>
                                                 <!-- Verify Payment Proof -->
@@ -931,13 +1032,21 @@ require_once __DIR__ . '/../includes/header.php';
                                                             🧾 GST Invoice
                                                         </a>
                                                     <?php endif; ?>
+                                                    <button onclick="confirmUnpublish(<?php echo $j['id']; ?>, '<?php echo addslashes(sanitize($j['journal_number'])); ?>')" style="background: #fff7ed; border: 1px solid #fed7aa; color: #c2410c; font-size: 0.72rem; cursor: pointer; padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; width: fit-content;" onmouseover="this.style.background='#ffedd5'" onmouseout="this.style.background='#fff7ed'">
+                                                        ↩️ Unpublish & Revise
+                                                    </button>
                                                     <button onclick="confirmRevert(<?php echo $j['id']; ?>, '<?php echo addslashes(sanitize($j['journal_number'])); ?>')" style="background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; font-size: 0.72rem; cursor: pointer; padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; width: fit-content;" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fef2f2'">
                                                         ↩️ Revert to Pay Status
                                                     </button>
                                                 </div>
                                             </div>
                                         <?php else: ?>
-                                            <span style="font-size: 0.8rem; color: var(--text-muted);">Awaiting review</span>
+                                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                                <span style="font-size: 0.8rem; color: var(--text-muted);">Awaiting review</span>
+                                                <button onclick="confirmDirectApprove(<?php echo $j['id']; ?>, '<?php echo addslashes(sanitize($j['journal_number'])); ?>')" style="background: #e0f2fe; border: 1px solid #bae6fd; color: #0369a1; font-size: 0.72rem; cursor: pointer; padding: 4px 10px; border-radius: 5px; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; width: fit-content; transition: all 0.2s;" onmouseover="this.style.background='#bae6fd'" onmouseout="this.style.background='#e0f2fe'">
+                                                    ✔️ Approve Manuscript
+                                                </button>
+                                            </div>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
@@ -1349,6 +1458,83 @@ function confirmRevert(journalId, journalNo) {
             inputRevert.name = 'revert_publication';
             inputRevert.value = '1';
             form.appendChild(inputRevert);
+            
+            var inputId = document.createElement('input');
+            inputId.type = 'hidden';
+            inputId.name = 'journal_id';
+            inputId.value = journalId;
+            form.appendChild(inputId);
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+}
+
+function confirmUnpublish(journalId, journalNo) {
+    Swal.fire({
+        title: 'Unpublish & Request Revision?',
+        html: 'Are you sure you want to unpublish manuscript <strong>' + journalNo + '</strong> and request revision?<br><br>' +
+              'This will:<br>' +
+              '• Change journal status to "Revisions Required".<br>' +
+              '• Hide the journal from the public Archive.<br>' +
+              '• Allow the author to upload updates/corrections.<br>' +
+              '• <strong style="color: #16a34a;">Preserve</strong> all payments, invoices, and wallet commissions.<br><br>' +
+              '<span style="color: #ca8a04; font-weight: 600;">The paper can be republished once the update is approved.</span>',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#d97706',
+        cancelButtonColor: '#475569',
+        confirmButtonText: 'Yes, unpublish it!',
+        cancelButtonText: 'Cancel',
+        focusCancel: true
+    }).then((result) => {
+        if (result.isConfirmed) {
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = 'dashboard.php';
+            
+            var inputUnpublish = document.createElement('input');
+            inputUnpublish.type = 'hidden';
+            inputUnpublish.name = 'unpublish_journal';
+            inputUnpublish.value = '1';
+            form.appendChild(inputUnpublish);
+            
+            var inputId = document.createElement('input');
+            inputId.type = 'hidden';
+            inputId.name = 'journal_id';
+            inputId.value = journalId;
+            form.appendChild(inputId);
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+}
+
+function confirmDirectApprove(journalId, journalNo) {
+    Swal.fire({
+        title: 'Approve Manuscript Directly?',
+        html: 'Are you sure you want to approve manuscript <strong>' + journalNo + '</strong> directly?<br><br>' +
+              'This will bypass any pending verifier review and mark the paper as ready for publication.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#0284c7',
+        cancelButtonColor: '#475569',
+        confirmButtonText: 'Yes, approve it!',
+        cancelButtonText: 'Cancel',
+        focusCancel: true
+    }).then((result) => {
+        if (result.isConfirmed) {
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = 'dashboard.php';
+            
+            var inputApprove = document.createElement('input');
+            inputApprove.type = 'hidden';
+            inputApprove.name = 'approve_manuscript';
+            inputApprove.value = '1';
+            form.appendChild(inputApprove);
             
             var inputId = document.createElement('input');
             inputId.type = 'hidden';
