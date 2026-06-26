@@ -218,14 +218,7 @@ require_once __DIR__ . '/includes/header.php';
             <?php echo nl2br(sanitize($journal['abstract'])); ?>
         </div>
 
-        <?php if (!empty($journal['content'])): ?>
-            <h2 style="font-family: var(--font-heading); font-size: 1.5rem; color: var(--primary-color); margin-bottom: 1rem; border-bottom: 2px solid var(--border-color); padding-bottom: 8px; margin-top: 3rem;">
-                Full Text / Manuscript Content
-            </h2>
-            <div class="rich-content" style="font-size: 1rem; line-height: 1.7; color: #1e293b; text-align: justify;">
-                <?php echo strip_tags($journal['content'], '<a><p><strong><em><u><h1><h2><h3><h4><h5><h6><ul><ol><li><blockquote><br>'); ?>
-            </div>
-        <?php endif; ?>
+
 
         <?php if ($journal['status'] === 'published' && !empty($journal['volume'])): ?>
             <div style="margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); font-size: 0.85rem; color: var(--text-muted); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 15px;">

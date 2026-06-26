@@ -199,10 +199,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['publish_journal'])) {
             $curr_bill = $chk_bill->fetchColumn();
 
             if (empty($curr_bill)) {
-                $pub_time = strtotime($pub_at);
-                $month = intval(date('m', $pub_time));
-                $year = intval(date('Y', $pub_time));
-                $year_short = intval(date('y', $pub_time));
+                // Fetch the payment's created_at timestamp
+                $stmt_pay_time = $pdo->prepare("SELECT created_at FROM payments WHERE journal_id = ?");
+                $stmt_pay_time->execute([$journal_id]);
+                $pay_created_at = $stmt_pay_time->fetchColumn();
+                
+                $bill_time = !empty($pay_created_at) ? strtotime($pay_created_at) : time();
+                $month = intval(date('m', $bill_time));
+                $year = intval(date('Y', $bill_time));
+                $year_short = intval(date('y', $bill_time));
                 
                 if ($month >= 4) {
                     $fy_start = "$year-04-01 00:00:00";
@@ -214,7 +219,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['publish_journal'])) {
                     $fy_label = ($year_short - 1) . '-' . $year_short;
                 }
                 
-                $stmt_count = $pdo->prepare("SELECT COUNT(*) FROM journals WHERE bill_number IS NOT NULL AND bill_number != '' AND published_at BETWEEN ? AND ?");
+                $stmt_count = $pdo->prepare("
+                    SELECT COUNT(*) 
+                    FROM journals j 
+                    LEFT JOIN payments p ON j.id = p.journal_id 
+                    WHERE j.bill_number IS NOT NULL 
+                      AND j.bill_number != '' 
+                      AND COALESCE(p.created_at, j.published_at) BETWEEN ? AND ?
+                ");
                 $stmt_count->execute([$fy_start, $fy_end]);
                 $count = intval($stmt_count->fetchColumn());
                 $next_seq = sprintf("%04d", $count + 1);
