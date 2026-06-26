@@ -1,8 +1,8 @@
 <?php
 /**
- * Temporary script to test PDF title encoding without reflection.
+ * Temporary script to test PDF title encoding.
  */
-require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/config/db.php';
 
 header('Content-Type: text/plain; charset=utf-8');
 
@@ -15,12 +15,12 @@ function local_sanitize_utf8_for_pdf($text) {
     $replacements = [
         "\xe2\x80\x98" => "'", // U+2018 left single quote
         "\xe2\x80\x99" => "'", // U+2019 right single quote (curly apostrophe)
-        "\xe2\x80\xaa" => "'",
-        "\xe2\x80\xab" => "'",
-        "\xe2\x80\xac" => '"', // U+201C left double quote
-        "\xe2\x80\xad" => '"', // U+201D right double quote
-        "\xe2\x80\xae" => '"',
-        "\xe2\x80\xaf" => '"',
+        "\xe2\x80\x9a" => "'",
+        "\xe2\x80\x9b" => "'",
+        "\xe2\x80\x9c" => '"', // U+201C left double quote
+        "\xe2\x80\x9d" => '"', // U+201D right double quote
+        "\xe2\x80\x9e" => '"',
+        "\xe2\x80\x9f" => '"',
         "\xe2\x80\x93" => '-', // U+2013 en-dash
         "\xe2\x80\x94" => '-', // U+2014 em-dash
         "\xe2\x80\xa6" => '...', // U+2026 horizontal ellipsis
