@@ -148,7 +148,8 @@ try {
         SELECT j.id, j.title, j.journal_number, j.bill_number, 
                (CASE WHEN j.base_amount IS NULL OR j.base_amount = 0 THEN j.payment_amount - COALESCE(j.gst_amount, 0) ELSE j.base_amount END) AS base_amount, 
                COALESCE(j.gst_amount, 0) AS gst_amount, j.payment_amount,
-               u.fullname AS author_name, u.email AS author_email, p.transaction_id, p.created_at AS payment_date
+               u.fullname AS author_name, u.email AS author_email, p.transaction_id, p.created_at AS payment_date,
+               p.payment_proof
         FROM journals j
         JOIN payments p ON j.id = p.journal_id
         JOIN users u ON j.author_id = u.id
@@ -298,9 +299,16 @@ require_once __DIR__ . '/../includes/header.php';
                                     <td style="text-align: right; font-weight: 700; color: var(--primary-color);">₹<?php echo number_format($inv['payment_amount'], 2); ?></td>
                                     <td>
                                         <?php if (!empty($inv['bill_number'])): ?>
-                                            <a href="<?php echo $path_prefix; ?>download.php?id=<?php echo $inv['id']; ?>&type=invoice" target="_blank" class="btn btn-primary" style="padding: 4px 8px; font-size: 0.75rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; text-decoration: none;">
-                                                ⬇ PDF
-                                            </a>
+                                            <div style="display: flex; gap: 6px; align-items: center;">
+                                                <a href="<?php echo $path_prefix; ?>download.php?id=<?php echo $inv['id']; ?>&type=invoice" target="_blank" class="btn btn-primary" style="padding: 4px 8px; font-size: 0.75rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; text-decoration: none;">
+                                                    ⬇ PDF
+                                                </a>
+                                                <?php if (!empty($inv['payment_proof'])): ?>
+                                                    <a href="<?php echo $path_prefix . htmlspecialchars($inv['payment_proof']); ?>" target="_blank" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.75rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; text-decoration: none; border: 1px solid var(--border-color); color: var(--primary-color);">
+                                                        📎 Receipt
+                                                    </a>
+                                                <?php endif; ?>
+                                            </div>
                                         <?php else: ?>
                                             <span style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">No Invoice</span>
                                         <?php endif; ?>
