@@ -385,6 +385,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_submission_date'
             $upd_journ = $pdo->prepare("UPDATE journals SET created_at = ? WHERE id = ?");
             $upd_journ->execute([$formatted_date, $journal_id]);
             
+            // Also update reviewer assignment date so that the acceptance letter reflects the new date
+            $upd_assign = $pdo->prepare("UPDATE reviewer_assignments SET assigned_at = ? WHERE journal_id = ?");
+            $upd_assign->execute([$formatted_date, $journal_id]);
+            
             // Regenerate PDF cover/metadata
             try {
                 require_once __DIR__ . '/../includes/word_helper.php';
