@@ -49,33 +49,90 @@ class RJPES_PDF {
         if (empty($text)) {
             return '';
         }
+
+        // Step 1: Replace known Unicode typographic characters with ASCII equivalents
         $replacements = [
-            "\xe2\x80\x98" => "'", // U+2018 left single quote
-            "\xe2\x80\x99" => "'", // U+2019 right single quote (curly apostrophe)
-            "\xe2\x80\x9a" => "'",
-            "\xe2\x80\x9b" => "'",
-            "\xe2\x80\x9c" => '"', // U+201C left double quote
-            "\xe2\x80\x9d" => '"', // U+201D right double quote
-            "\xe2\x80\x9e" => '"',
-            "\xe2\x80\x9f" => '"',
-            "\xe2\x80\x93" => '-', // U+2013 en-dash
-            "\xe2\x80\x94" => '-', // U+2014 em-dash
+            "\xe2\x80\x98" => "'",   // U+2018 left single quotation mark
+            "\xe2\x80\x99" => "'",   // U+2019 right single quotation mark (curly apostrophe)
+            "\xe2\x80\x9a" => "'",   // U+201A single low-9 quotation mark
+            "\xe2\x80\x9b" => "'",   // U+201B single high-reversed-9 quotation mark
+            "\xe2\x80\x9c" => '"',   // U+201C left double quotation mark
+            "\xe2\x80\x9d" => '"',   // U+201D right double quotation mark
+            "\xe2\x80\x9e" => '"',   // U+201E double low-9 quotation mark
+            "\xe2\x80\x9f" => '"',   // U+201F double high-reversed-9 quotation mark
+            "\xe2\x80\x93" => '-',   // U+2013 en-dash
+            "\xe2\x80\x94" => '-',   // U+2014 em-dash
+            "\xe2\x80\x90" => '-',   // U+2010 hyphen
+            "\xe2\x80\x91" => '-',   // U+2011 non-breaking hyphen
+            "\xe2\x80\x92" => '-',   // U+2012 figure dash
+            "\xe2\x80\x95" => '-',   // U+2015 horizontal bar
             "\xe2\x80\xa6" => '...', // U+2026 horizontal ellipsis
-            "\xc2\xa0" => ' ',
+            "\xe2\x80\xa2" => '-',   // U+2022 bullet
+            "\xc2\xa0"     => ' ',   // U+00A0 non-breaking space
+            "\xe2\x80\x82" => ' ',   // U+2002 en space
+            "\xe2\x80\x83" => ' ',   // U+2003 em space
+            "\xe2\x82\xac" => 'EUR', // U+20AC euro sign
+            "\xc2\xab"     => '"',   // U+00AB left-pointing double angle quotation mark
+            "\xc2\xbb"     => '"',   // U+00BB right-pointing double angle quotation mark
+            "\xe2\x84\xa2" => 'TM',  // U+2122 trade mark sign
+            "\xc2\xae"     => '(R)', // U+00AE registered sign
+            "\xc2\xa9"     => '(C)', // U+00A9 copyright sign
+            "\xc2\xb0"     => 'o',   // U+00B0 degree sign
+            "\xe2\x80\xb2" => "'",   // U+2032 prime
+            "\xe2\x80\xb3" => '"',   // U+2033 double prime
         ];
         $text = strtr($text, $replacements);
-        
+
+        // Step 2: Try iconv conversion (try multiple encoding aliases for cross-platform support)
         if (mb_check_encoding($text, 'UTF-8')) {
-            $converted = @iconv('UTF-8', 'windows-1252//TRANSLIT', $text);
-            if ($converted !== false) {
-                return $converted;
+            foreach (['windows-1252', 'Windows-1252', 'CP1252', 'cp1252', 'WINDOWS-1252'] as $enc) {
+                $converted = @iconv('UTF-8', $enc . '//TRANSLIT', $text);
+                if ($converted !== false) {
+                    return $converted;
+                }
+                // Try with IGNORE as a softer fallback (drops unconvertible chars)
+                $converted = @iconv('UTF-8', $enc . '//IGNORE', $text);
+                if ($converted !== false) {
+                    return $converted;
+                }
             }
             $converted_mb = @mb_convert_encoding($text, 'Windows-1252', 'UTF-8');
             if ($converted_mb !== false) {
                 return $converted_mb;
             }
         }
-        return $text;
+
+        // Step 3: Byte-level fallback — guarantees no multi-byte UTF-8 sequences
+        // remain in the output (they would render as garbage â€™ in WinAnsiEncoding PDFs).
+        $result = '';
+        $len = strlen($text);
+        for ($i = 0; $i < $len; $i++) {
+            $byte = ord($text[$i]);
+            if ($byte <= 0x7F) {
+                // Plain ASCII — always safe in WinAnsiEncoding
+                $result .= $text[$i];
+            } elseif ($byte >= 0xC2 && $byte <= 0xC3 && ($i + 1) < $len) {
+                // 2-byte UTF-8 sequence covering U+0080–U+00FF (Latin-1 Supplement).
+                // These map 1:1 to bytes 0x80–0xFF in Windows-1252, but we only keep
+                // the printable range (skip 0x80–0x9F which are control/special in PDF).
+                $next = ord($text[$i + 1]);
+                if ($next >= 0x80 && $next <= 0xBF) {
+                    $codepoint = (($byte & 0x1F) << 6) | ($next & 0x3F);
+                    if ($codepoint >= 0xA0) {
+                        $result .= chr($codepoint); // single byte in Windows-1252
+                    }
+                    $i++;
+                }
+            } elseif ($byte >= 0xC4 && $byte <= 0xDF && ($i + 1) < $len) {
+                $i += 1; // skip 2-byte sequence outside Latin-1
+            } elseif ($byte >= 0xE0 && $byte <= 0xEF && ($i + 2) < $len) {
+                $i += 2; // skip 3-byte sequence
+            } elseif ($byte >= 0xF0 && ($i + 3) < $len) {
+                $i += 3; // skip 4-byte sequence
+            }
+            // Bare continuation bytes (0x80–0xBF) are skipped
+        }
+        return $result;
     }
     
     private function escape_text($text) {

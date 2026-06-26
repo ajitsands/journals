@@ -618,7 +618,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['unpublish_journal']))
     }
 }
 
-// Fetch admin dashboard stats
+// 9. Handle Manual PDF Regeneration (admin force-regenerates cover + headers/footers)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['regen_pdf'])) {
+    $journal_id = intval($_POST['journal_id']);
+    if ($journal_id > 0) {
+        try {
+            require_once __DIR__ . '/../includes/word_helper.php';
+            $regen_ok = rjpes_regenerate_journal_pdf($journal_id);
+            if ($regen_ok) {
+                $j_stmt = $pdo->prepare("SELECT journal_number FROM journals WHERE id = ?");
+                $j_stmt->execute([$journal_id]);
+                $j_row = $j_stmt->fetch();
+                $message = "PDF for manuscript <strong>" . sanitize($j_row['journal_number'] ?? $journal_id) . "</strong> has been regenerated successfully with the latest code and metadata.";
+                $message_type = "success";
+            } else {
+                $message = "PDF regeneration failed — check that the manuscript PDF file exists on disk and Python/fitz is available.";
+                $message_type = "danger";
+            }
+        } catch (Exception $e) {
+            $message = "PDF regeneration error: " . $e->getMessage();
+            $message_type = "danger";
+        }
+    }
+}
+
+
 try {
     $current_vol = rjpes_get_setting('current_volume', '20');
     $current_issue = rjpes_get_setting('current_issue', '1');
@@ -1054,7 +1078,11 @@ require_once __DIR__ . '/../includes/header.php';
                                                     <button onclick="confirmRevert(<?php echo $j['id']; ?>, '<?php echo addslashes(sanitize($j['journal_number'])); ?>')" style="background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; font-size: 0.72rem; cursor: pointer; padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; width: fit-content;" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fef2f2'">
                                                         ↩️ Revert to Pay Status
                                                     </button>
+                                                    <button onclick="confirmRegenPdf(<?php echo $j['id']; ?>, '<?php echo addslashes(sanitize($j['journal_number'])); ?>')" style="background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; font-size: 0.72rem; cursor: pointer; padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; width: fit-content;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">
+                                                        🔄 Regenerate PDF
+                                                    </button>
                                                 </div>
+
                                             </div>
                                         <?php else: ?>
                                             <div style="display: flex; flex-direction: column; gap: 6px;">
@@ -1558,6 +1586,42 @@ function confirmDirectApprove(journalId, journalNo) {
             inputId.value = journalId;
             form.appendChild(inputId);
             
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+}
+
+function confirmRegenPdf(journalId, journalNo) {
+    Swal.fire({
+        title: 'Regenerate PDF Cover?',
+        html: 'This will re-render the cover page and running headers/footers for manuscript <strong>' + journalNo + '</strong> using the latest code and database metadata.<br><br>' +
+              '<span style="color: #0284c7; font-weight: 600;">The body/content pages from the original Word document will be preserved.</span>',
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonColor: '#0284c7',
+        cancelButtonColor: '#475569',
+        confirmButtonText: 'Yes, regenerate it!',
+        cancelButtonText: 'Cancel',
+        focusCancel: true
+    }).then((result) => {
+        if (result.isConfirmed) {
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = 'dashboard.php';
+
+            var inputRegen = document.createElement('input');
+            inputRegen.type = 'hidden';
+            inputRegen.name = 'regen_pdf';
+            inputRegen.value = '1';
+            form.appendChild(inputRegen);
+
+            var inputId = document.createElement('input');
+            inputId.type = 'hidden';
+            inputId.name = 'journal_id';
+            inputId.value = journalId;
+            form.appendChild(inputId);
+
             document.body.appendChild(form);
             form.submit();
         }
