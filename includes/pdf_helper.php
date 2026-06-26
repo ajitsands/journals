@@ -211,8 +211,18 @@ class RJPES_PDF {
             return '';
         }
         
+        // Decode HTML entities fully first (handles potential double-encoding)
+        $text = $html;
+        for ($i = 0; $i < 5; $i++) {
+            $decoded = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if ($decoded === $text) {
+                break;
+            }
+            $text = $decoded;
+        }
+        
         // Replace <br> and <br /> with newlines
-        $text = preg_replace('/<br\s*\/?>/i', "\n", $html);
+        $text = preg_replace('/<br\s*\/?>/i', "\n", $text);
         
         // Replace closed block tags with newlines
         $block_tags = ['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'li'];
@@ -225,9 +235,6 @@ class RJPES_PDF {
         
         // Strip remaining HTML tags
         $text = strip_tags($text);
-        
-        // Decode HTML entities (e.g. &nbsp;, &amp;)
-        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         
         // Standardize carriage returns
         $text = str_replace("\r", "", $text);
