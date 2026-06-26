@@ -45,7 +45,41 @@ class RJPES_PDF {
         $this->write("endobj\n");
     }
     
+    private function sanitize_utf8_for_pdf($text) {
+        if (empty($text)) {
+            return '';
+        }
+        $replacements = [
+            "\xe2\x80\x98" => "'", // U+2018 left single quote
+            "\xe2\x80\x99" => "'", // U+2019 right single quote (curly apostrophe)
+            "\xe2\x80\x9a" => "'",
+            "\xe2\x80\x9b" => "'",
+            "\xe2\x80\x9c" => '"', // U+201C left double quote
+            "\xe2\x80\x9d" => '"', // U+201D right double quote
+            "\xe2\x80\x9e" => '"',
+            "\xe2\x80\x9f" => '"',
+            "\xe2\x80\x93" => '-', // U+2013 en-dash
+            "\xe2\x80\x94" => '-', // U+2014 em-dash
+            "\xe2\x80\xa6" => '...', // U+2026 horizontal ellipsis
+            "\xc2\xa0" => ' ',
+        ];
+        $text = strtr($text, $replacements);
+        
+        if (mb_check_encoding($text, 'UTF-8')) {
+            $converted = @iconv('UTF-8', 'windows-1252//TRANSLIT', $text);
+            if ($converted !== false) {
+                return $converted;
+            }
+            $converted_mb = @mb_convert_encoding($text, 'Windows-1252', 'UTF-8');
+            if ($converted_mb !== false) {
+                return $converted_mb;
+            }
+        }
+        return $text;
+    }
+    
     private function escape_text($text) {
+        $text = $this->sanitize_utf8_for_pdf($text);
         // Remove unsupported characters and escape parentheses
         $text = str_replace(array('\\', '(', ')'), array('\\\\', '\\(', '\\)'), $text);
         return $text;
@@ -249,6 +283,7 @@ class RJPES_PDF {
      * Estimates text width in Helvetica/Helvetica-Bold
      */
     private function get_text_width($text, $font_size) {
+        $text = $this->sanitize_utf8_for_pdf($text);
         static $helvetica_widths = [
             ' ' => 278, '!' => 278, '"' => 355, '#' => 556, '$' => 556, '%' => 889, '&' => 667, '\'' => 191,
             '(' => 333, ')' => 333, '*' => 389, '+' => 584, ',' => 278, '-' => 333, '.' => 278, '/' => 278,
