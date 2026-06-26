@@ -212,7 +212,16 @@ require_once __DIR__ . '/../includes/header.php';
                                         <!-- Abstract Preview Container -->
                                         <div id="abstract-preview-<?php echo $row['journal_id']; ?>" style="display: none; background-color: #f8fafc; padding: 1rem; border-radius: 8px; margin-top: 10px; border: 1px solid var(--border-color);">
                                             <h4 style="font-family: var(--font-heading); color: var(--primary-color); margin-bottom: 8px; font-size: 0.85rem;">Abstract Preview</h4>
-                                            <p style="font-size: 0.82rem; font-style: italic; color: #334155; line-height: 1.5; margin: 0; font-weight: normal;"><?php echo nl2br(sanitize($row['abstract'])); ?></p>
+                                            <div style="font-size: 0.82rem; font-style: italic; color: #334155; line-height: 1.5; margin: 0; font-weight: normal;">
+                                                <?php 
+                                                $decoded_abstract = html_entity_decode($row['abstract'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                                                if (strpos($decoded_abstract, '<p>') === false && strpos($decoded_abstract, '<div>') === false) {
+                                                    echo nl2br(strip_tags($decoded_abstract, '<a><strong><em><u><br>'));
+                                                } else {
+                                                    echo strip_tags($decoded_abstract, '<a><p><strong><em><u><ul><ol><li><blockquote><br>');
+                                                }
+                                                ?>
+                                            </div>
                                         </div>
                                     </td>
                                     <td>

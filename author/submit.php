@@ -595,7 +595,7 @@ require_once __DIR__ . '/../includes/header.php';
 
                 <div class="form-group">
                     <label for="abstract">Abstract</label>
-                    <textarea name="abstract" id="abstract" class="form-control" rows="8" placeholder="Provide a concise abstract of your paper (around 150-250 words) outlining background, methods, results, and conclusion."><?php echo $is_edit ? sanitize($edit_journal['abstract']) : ''; ?></textarea>
+                    <textarea name="abstract" id="abstract" class="form-control" rows="8" placeholder="Provide a concise abstract of your paper (around 150-250 words) outlining background, methods, results, and conclusion."><?php echo $is_edit ? htmlspecialchars(html_entity_decode($edit_journal['abstract'], ENT_QUOTES | ENT_HTML5, 'UTF-8')) : ''; ?></textarea>
                 </div>
 
                 <div class="form-group" style="display: none;">

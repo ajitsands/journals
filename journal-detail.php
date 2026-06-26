@@ -215,7 +215,14 @@ require_once __DIR__ . '/includes/header.php';
             Abstract
         </h2>
         <div style="font-size: 1.1rem; line-height: 1.8; color: #334155; text-align: justify; margin-bottom: 2rem; font-style: italic; background-color: #f8fafc; padding: 2rem; border-radius: 8px; border-left: 4px solid var(--primary-color);">
-            <?php echo nl2br(sanitize($journal['abstract'])); ?>
+            <?php 
+            $decoded_abstract = html_entity_decode($journal['abstract'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if (strpos($decoded_abstract, '<p>') === false && strpos($decoded_abstract, '<div>') === false) {
+                echo nl2br(strip_tags($decoded_abstract, '<a><strong><em><u><br>'));
+            } else {
+                echo strip_tags($decoded_abstract, '<a><p><strong><em><u><ul><ol><li><blockquote><br>');
+            }
+            ?>
         </div>
 
 
